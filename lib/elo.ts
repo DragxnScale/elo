@@ -1,8 +1,8 @@
-const K_FACTOR = 64;
+/** Flat points added to every rating change. */
+const BASE_POINTS = 10;
 
-function expectedScore(playerElo: number, opponentElo: number): number {
-  return 1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400));
-}
+/** Percent of a player's own ELO (0.08 = 0.08%, so +8 per 10,000 ELO). */
+const ELO_PERCENT = 0.08;
 
 export type EloChange = {
   winnerGain: number;
@@ -11,23 +11,43 @@ export type EloChange = {
   loserNewElo: number;
 };
 
+function pointsFromElo(elo: number): number {
+  return BASE_POINTS + (elo * ELO_PERCENT) / 100;
+}
+
 export function calculateEloChange(
   winnerElo: number,
   loserElo: number
 ): Pick<EloChange, "winnerGain" | "loserLoss"> {
-  const expectedWinner = expectedScore(winnerElo, loserElo);
-  const expectedLoser = expectedScore(loserElo, winnerElo);
+  let winnerGain = pointsFromElo(winnerElo);
+  let loserLoss = pointsFromElo(loserElo);
 
-  let winnerGain = Math.round(K_FACTOR * (1 - expectedWinner));
-  let loserLoss = Math.round(K_FACTOR * expectedLoser);
+  const ratingGap = loserElo - winnerElo;
+  const avgElo = (winnerElo + loserElo) / 2;
+
+  if (ratingGap > 0 && avgElo > 0) {
+    const upsetMultiplier = 1 + (ratingGap / avgElo) * 2;
+    winnerGain *= upsetMultiplier;
+    loserLoss *= upsetMultiplier * 0.9;
+  } else if (ratingGap < 0 && avgElo > 0) {
+    const favoriteMultiplier = Math.max(
+      0.35,
+      1 - (-ratingGap / avgElo) * 0.5
+    );
+    winnerGain *= favoriteMultiplier;
+    loserLoss *= favoriteMultiplier;
+  }
+
+  winnerGain = Math.round(winnerGain);
+  loserLoss = Math.round(loserLoss);
 
   winnerGain = Math.max(1, winnerGain);
   loserLoss = Math.max(1, loserLoss);
 
   if (winnerGain <= loserLoss) {
-    const gap = loserLoss - winnerGain + 1;
-    winnerGain += Math.ceil(gap / 2) + 1;
-    loserLoss = Math.max(1, loserLoss - Math.floor(gap / 2));
+    loserLoss = Math.max(1, winnerGain - 2);
+  } else if (winnerGain - loserLoss < 2) {
+    loserLoss = Math.max(1, winnerGain - 2);
   }
 
   return { winnerGain, loserLoss };

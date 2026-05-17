@@ -10,6 +10,12 @@ function test(name: string, fn: () => void) {
   }
 }
 
+test("uses fixed base plus percent of elo at equal ratings", () => {
+  const { winnerGain, loserLoss } = calculateEloChange(10000, 10000);
+  if (winnerGain !== 18) throw new Error(`expected +18, got +${winnerGain}`);
+  if (loserLoss !== 16) throw new Error(`expected -16, got -${loserLoss}`);
+});
+
 test("winner gains more than loser loses", () => {
   const { winnerGain, loserLoss } = calculateEloChange(1000, 1000);
   if (winnerGain <= loserLoss) throw new Error(`${winnerGain} <= ${loserLoss}`);
