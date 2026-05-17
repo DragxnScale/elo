@@ -1,4 +1,4 @@
-const K_FACTOR = 32;
+const K_FACTOR = 64;
 
 function expectedScore(playerElo: number, opponentElo: number): number {
   return 1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400));

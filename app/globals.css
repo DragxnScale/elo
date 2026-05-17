@@ -42,3 +42,13 @@ select.input-futuristic option {
   background: #0f172a;
   color: #e2e8f0;
 }
+
+.select-match {
+  @apply min-h-[3.25rem] min-w-[12rem] flex-1 cursor-pointer px-4 py-3 text-base font-medium;
+}
+
+@media (min-width: 640px) {
+  .select-match {
+    min-width: 14rem;
+  }
+}

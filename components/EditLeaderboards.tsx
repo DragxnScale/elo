@@ -192,48 +192,50 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
             </button>
           </form>
 
-          <section className="rounded-xl border border-violet-500/20 bg-slate-900/30 p-4 space-y-4">
+          <section className="rounded-xl border border-violet-500/20 bg-slate-900/30 p-5 space-y-5 sm:p-6">
             <h3 className="text-sm font-medium uppercase tracking-wider text-slate-500">
               Record match
             </h3>
-            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-300">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-3">
               <select
                 value={winnerId}
                 onChange={(e) => {
                   setWinnerId(e.target.value);
                   setPending(null);
                 }}
-                className="input-futuristic"
+                className="input-futuristic select-match w-full"
               >
-                <option value="">Winner…</option>
+                <option value="">Select winner…</option>
                 {players.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} ({p.elo})
+                    {p.name} ({p.elo} ELO)
                   </option>
                 ))}
               </select>
-              <span className="text-cyan-500/80 font-medium">beat</span>
+              <span className="flex shrink-0 items-center justify-center text-lg font-semibold text-cyan-400 lg:px-1">
+                beat
+              </span>
               <select
                 value={loserId}
                 onChange={(e) => {
                   setLoserId(e.target.value);
                   setPending(null);
                 }}
-                className="input-futuristic"
+                className="input-futuristic select-match w-full"
               >
-                <option value="">Loser…</option>
+                <option value="">Select loser…</option>
                 {players
                   .filter((p) => p.id !== winnerId)
                   .map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} ({p.elo})
+                      {p.name} ({p.elo} ELO)
                     </option>
                   ))}
               </select>
               <button
                 type="button"
                 onClick={previewMatch}
-                className="btn-secondary"
+                className="btn-secondary min-h-[3.25rem] shrink-0 px-6 text-base lg:min-w-[10rem]"
                 disabled={players.length < 2}
               >
                 Preview changes
@@ -241,26 +243,36 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
             </div>
 
             {pending && (
-              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
-                <p className="font-medium text-emerald-200">
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5 sm:p-6">
+                <p className="text-lg font-semibold text-emerald-200">
                   {pending.winnerName} beats {pending.loserName}
                 </p>
-                <ul className="mt-2 space-y-1 text-slate-400">
-                  <li>
-                    <span className="text-emerald-400">{pending.winnerName}</span>
-                    : +{pending.change.winnerGain} →{" "}
-                    <span className="font-mono text-cyan-300">
-                      {pending.change.winnerNewElo}
+                <ul className="mt-4 space-y-3">
+                  <li className="flex flex-wrap items-baseline gap-2 text-base text-slate-300">
+                    <span className="font-medium text-emerald-400">
+                      {pending.winnerName}
+                    </span>
+                    <span className="font-mono text-2xl font-bold text-emerald-300">
+                      +{pending.change.winnerGain}
+                    </span>
+                    <span className="text-slate-500">→</span>
+                    <span className="font-mono text-xl text-cyan-300">
+                      {pending.change.winnerNewElo} ELO
                     </span>
                   </li>
-                  <li>
-                    <span className="text-red-400">{pending.loserName}</span>: −
-                    {pending.change.loserLoss} →{" "}
-                    <span className="font-mono text-cyan-300">
-                      {pending.change.loserNewElo}
+                  <li className="flex flex-wrap items-baseline gap-2 text-base text-slate-300">
+                    <span className="font-medium text-red-400">
+                      {pending.loserName}
+                    </span>
+                    <span className="font-mono text-2xl font-bold text-red-300">
+                      −{pending.change.loserLoss}
+                    </span>
+                    <span className="text-slate-500">→</span>
+                    <span className="font-mono text-xl text-cyan-300">
+                      {pending.change.loserNewElo} ELO
                     </span>
                   </li>
-                  <li className="text-xs text-slate-600 pt-1">
+                  <li className="pt-1 text-sm text-slate-500">
                     Winner gains more than loser loses (
                     +{pending.change.winnerGain} vs −{pending.change.loserLoss})
                   </li>
@@ -269,7 +281,7 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
                   type="button"
                   onClick={confirmMatch}
                   disabled={loading}
-                  className="btn-primary mt-4"
+                  className="btn-primary mt-6 px-8 py-3 text-base"
                 >
                   {loading ? "Applying…" : "Confirm changes"}
                 </button>
