@@ -1,21 +1,18 @@
 "use client";
 
-import { getSupabaseEnv } from "@/lib/env";
+import { getSupabaseConfigError } from "@/lib/env";
 
 export function ConfigBanner() {
-  const { isConfigured } = getSupabaseEnv();
+  const message = getSupabaseConfigError();
 
-  if (isConfigured) return null;
+  if (!message) return null;
 
   return (
     <div className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
-      Supabase is not configured. Add{" "}
+      {message} Set{" "}
       <code className="font-mono text-amber-200">NEXT_PUBLIC_SUPABASE_URL</code>{" "}
-      and{" "}
-      <code className="font-mono text-amber-200">
-        NEXT_PUBLIC_SUPABASE_ANON_KEY
-      </code>{" "}
-      in Vercel → Project → Settings → Environment Variables, then redeploy.
+      to <code className="font-mono text-amber-200">https://xxx.supabase.co</code>{" "}
+      and your publishable key in Vercel env vars, then redeploy.
     </div>
   );
 }

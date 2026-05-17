@@ -62,7 +62,12 @@ export function AppShell() {
               Live ratings. Upsets rewarded. Fair losses cushioned.
             </p>
           </div>
-          <AuthPanel username={username} onAuthChange={refreshAuth} />
+          <AuthPanel
+            username={username}
+            onAuthChange={refreshAuth}
+            canCreateMatch={hasBoards}
+            onCreateMatch={() => setTab("edit")}
+          />
         </div>
       </header>
 

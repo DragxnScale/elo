@@ -1,34 +1,144 @@
 "use client";
 
 import { useState } from "react";
-import { signIn, signUp, signOut } from "@/app/actions";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import {
+  normalizeUsername,
+  isValidUsername,
+  usernameToEmail,
+} from "@/lib/auth";
+import { getSupabaseConfigError } from "@/lib/env";
+import { AuthModal } from "@/components/AuthModal";
+import { signOut } from "@/app/actions";
 
 type AuthPanelProps = {
   username: string | null;
   onAuthChange: () => void;
+  onCreateMatch?: () => void;
+  canCreateMatch?: boolean;
 };
 
-export function AuthPanel({ username, onAuthChange }: AuthPanelProps) {
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+export function AuthPanel({
+  username,
+  onAuthChange,
+  onCreateMatch,
+  canCreateMatch = false,
+}: AuthPanelProps) {
+  const router = useRouter();
+  const [modal, setModal] = useState<"signin" | "signup" | null>(null);
   const [user, setUser] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  function openModal(mode: "signin" | "signup") {
+    setError(null);
+    setModal(mode);
+  }
+
+  function closeModal() {
+    setModal(null);
+    setError(null);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const configError = getSupabaseConfigError();
+    if (configError) {
+      setError(configError);
+      setLoading(false);
+      return;
+    }
+
+    const normalized = normalizeUsername(user);
+    if (!isValidUsername(normalized)) {
+      setError(
+        "Username must be 3–20 characters: letters, numbers, underscore only (no email)."
+      );
+      setLoading(false);
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      setLoading(false);
+      return;
+    }
+
+    const supabase = createClient();
+    const email = usernameToEmail(normalized);
+
+    if (modal === "signin") {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (signInError) {
+        setError(signInError.message);
+        setLoading(false);
+        return;
+      }
+    } else {
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { username: normalized } },
+      });
+      if (signUpError) {
+        setError(signUpError.message);
+        setLoading(false);
+        return;
+      }
+      if (!data.user) {
+        setError("Sign up failed. Try again.");
+        setLoading(false);
+        return;
+      }
+
+      const { error: profileError } = await supabase.from("profiles").insert({
+        id: data.user.id,
+        username: normalized,
+      });
+
+      if (profileError && profileError.code !== "23505") {
+        setError(profileError.message);
+        setLoading(false);
+        return;
+      }
+    }
+
+    setUser("");
+    setPassword("");
+    setLoading(false);
+    closeModal();
+    onAuthChange();
+    router.refresh();
+  }
+
   if (username) {
     return (
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-slate-400">
-          Signed in as{" "}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <span className="hidden text-sm text-slate-400 sm:inline">
           <span className="font-mono text-cyan-300">@{username}</span>
         </span>
+        {canCreateMatch && onCreateMatch && (
+          <button type="button" onClick={onCreateMatch} className="btn-secondary">
+            Create match
+          </button>
+        )}
         <button
           type="button"
           onClick={async () => {
+            const supabase = createClient();
+            await supabase.auth.signOut();
             await signOut();
             onAuthChange();
+            router.refresh();
           }}
-          className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs text-slate-300 transition hover:border-cyan-500/50 hover:text-cyan-300"
+          className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300 transition hover:border-cyan-500/50 hover:text-cyan-300"
         >
           Sign out
         </button>
@@ -36,75 +146,37 @@ export function AuthPanel({ username, onAuthChange }: AuthPanelProps) {
     );
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    const result =
-      mode === "signin"
-        ? await signIn(user, password)
-        : await signUp(user, password);
-    setLoading(false);
-    if (result.error) {
-      setError(result.error);
-      return;
-    }
-    setUser("");
-    setPassword("");
-    onAuthChange();
-  }
-
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="flex flex-wrap items-end gap-3 rounded-xl border border-cyan-500/20 bg-slate-900/40 p-4"
-    >
-      <div>
-        <label className="mb-1 block text-xs text-slate-500">Username</label>
-        <input
-          value={user}
-          onChange={(e) => setUser(e.target.value)}
-          className="input-futuristic w-36"
-          placeholder="player_1"
-          autoComplete="username"
-          required
-        />
+    <>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => openModal("signin")}
+          className="rounded-lg border border-cyan-500/40 px-4 py-2 text-sm font-medium text-cyan-200 transition hover:bg-cyan-500/10"
+        >
+          Sign in
+        </button>
+        <button
+          type="button"
+          onClick={() => openModal("signup")}
+          className="btn-primary"
+        >
+          Create account
+        </button>
       </div>
-      <div>
-        <label className="mb-1 block text-xs text-slate-500">Password</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="input-futuristic w-36"
-          placeholder="••••••"
-          autoComplete={
-            mode === "signin" ? "current-password" : "new-password"
-          }
-          required
-          minLength={6}
-        />
-      </div>
-      <button
-        type="submit"
-        disabled={loading}
-        className="btn-primary"
-      >
-        {loading ? "…" : mode === "signin" ? "Sign in" : "Sign up"}
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          setMode(mode === "signin" ? "signup" : "signin");
-          setError(null);
-        }}
-        className="text-xs text-cyan-400/80 underline-offset-2 hover:underline"
-      >
-        {mode === "signin" ? "Create account" : "Have an account?"}
-      </button>
-      {error && (
-        <p className="w-full text-xs text-red-400">{error}</p>
-      )}
-    </form>
+
+      <AuthModal
+        open={modal !== null}
+        mode={modal ?? "signin"}
+        username={user}
+        password={password}
+        loading={loading}
+        error={error}
+        onUsernameChange={setUser}
+        onPasswordChange={setPassword}
+        onSubmit={handleSubmit}
+        onClose={closeModal}
+      />
+    </>
   );
 }
