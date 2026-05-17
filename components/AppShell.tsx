@@ -6,6 +6,7 @@ import { AuthPanel } from "@/components/AuthPanel";
 import { ViewLeaderboards } from "@/components/ViewLeaderboards";
 import { CreateLeaderboard } from "@/components/CreateLeaderboard";
 import { EditLeaderboards } from "@/components/EditLeaderboards";
+import { ConfigBanner } from "@/components/ConfigBanner";
 import { getMyLeaderboards } from "@/app/actions";
 
 type Tab = "view" | "create" | "edit";
@@ -47,6 +48,7 @@ export function AppShell() {
       <div className="pointer-events-none absolute -top-32 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-cyan-500/10 blur-3xl" />
       <div className="pointer-events-none absolute bottom-0 right-0 h-80 w-80 rounded-full bg-violet-600/10 blur-3xl" />
 
+      <ConfigBanner />
       <header className="relative border-b border-cyan-500/10 bg-[#050810]/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
