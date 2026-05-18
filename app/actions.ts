@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { generateShareCode } from "@/lib/codes";
 import { usernameToEmail, normalizeUsername, isValidUsername } from "@/lib/auth";
-import { applyMatch } from "@/lib/elo";
+import { calculateEloChange } from "@/lib/elo";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -207,10 +207,22 @@ export async function addPlayer(leaderboardId: string, name: string) {
 
 export async function applyMatchToLeaderboard(
   leaderboardId: string,
-  winnerId: string,
-  loserId: string
+  player1Id: string,
+  player2Id: string,
+  player1Score: number,
+  player2Score: number
 ) {
   const { supabase, user } = await requireUser();
+
+  if (player1Id === player2Id) {
+    return { error: "Pick two different players." };
+  }
+  if (player1Score < 0 || player2Score < 0) {
+    return { error: "Scores cannot be negative." };
+  }
+  if (player1Score === player2Score) {
+    return { error: "Tie game — no ELO change." };
+  }
 
   const { data: lb } = await supabase
     .from("leaderboards")
@@ -225,34 +237,38 @@ export async function applyMatchToLeaderboard(
     .from("players")
     .select("*")
     .eq("leaderboard_id", leaderboardId)
-    .in("id", [winnerId, loserId]);
+    .in("id", [player1Id, player2Id]);
 
   if (fetchError || !players || players.length !== 2) {
     return { error: "Could not find both players." };
   }
 
-  const winner = players.find((p) => p.id === winnerId);
-  const loser = players.find((p) => p.id === loserId);
-  if (!winner || !loser) return { error: "Invalid match players." };
-  if (winner.id === loser.id) return { error: "A player cannot beat themselves." };
+  const player1 = players.find((p) => p.id === player1Id);
+  const player2 = players.find((p) => p.id === player2Id);
+  if (!player1 || !player2) return { error: "Invalid match players." };
 
-  const change = applyMatch(winner.elo, loser.elo);
+  const change = calculateEloChange(
+    player1.elo,
+    player2.elo,
+    player1Score,
+    player2Score
+  );
 
-  const [winnerRes, loserRes] = await Promise.all([
+  const [p1Res, p2Res] = await Promise.all([
     supabase
       .from("players")
-      .update({ elo: change.winnerNewElo })
-      .eq("id", winnerId),
+      .update({ elo: change.player1NewElo })
+      .eq("id", player1Id),
     supabase
       .from("players")
-      .update({ elo: change.loserNewElo })
-      .eq("id", loserId),
+      .update({ elo: change.player2NewElo })
+      .eq("id", player2Id),
   ]);
 
-  if (winnerRes.error || loserRes.error) {
-    return { error: winnerRes.error?.message ?? loserRes.error?.message };
+  if (p1Res.error || p2Res.error) {
+    return { error: p1Res.error?.message ?? p2Res.error?.message };
   }
 
   revalidatePath("/");
-  return { change, winner, loser };
+  return { change, player1, player2 };
 }

@@ -1,4 +1,4 @@
-import { applyMatch, calculateEloChange } from "./elo";
+import { calculateEloChange } from "./elo";
 
 function test(name: string, fn: () => void) {
   try {
@@ -10,43 +10,48 @@ function test(name: string, fn: () => void) {
   }
 }
 
-test("uses fixed base plus 5% of elo at equal ratings", () => {
-  const { winnerGain, loserLoss } = calculateEloChange(10000, 10000);
-  if (winnerGain !== 510) throw new Error(`expected +510, got +${winnerGain}`);
-  if (loserLoss !== 508) throw new Error(`expected -508, got -${loserLoss}`);
+test("tie returns no change", () => {
+  const r = calculateEloChange(1000, 1200, 5, 5);
+  if (r.player1Change !== 0 || r.player2Change !== 0) {
+    throw new Error("tie should not change elo");
+  }
 });
 
 test("winner gains more than loser loses", () => {
-  const { winnerGain, loserLoss } = calculateEloChange(1000, 1000);
-  if (winnerGain <= loserLoss) throw new Error(`${winnerGain} <= ${loserLoss}`);
+  const r = calculateEloChange(1000, 1000, 10, 5);
+  if (r.winnerGain <= r.loserLoss) {
+    throw new Error(`${r.winnerGain} <= ${r.loserLoss}`);
+  }
+  if (r.loserLoss !== Math.round(r.winnerGain * 0.75)) {
+    throw new Error("loser loss should be 75% of winner gain");
+  }
 });
 
 test("upset gives bigger gain to underdog winner", () => {
-  const upset = calculateEloChange(800, 1400);
-  const expected = calculateEloChange(1400, 800);
-  if (upset.winnerGain <= expected.winnerGain) {
+  const upset = calculateEloChange(800, 1400, 10, 5);
+  const favorite = calculateEloChange(1400, 800, 10, 5);
+  if (upset.winnerGain <= favorite.winnerGain) {
     throw new Error("upset should reward more");
   }
 });
 
-test("favorite beating underdog gives smaller changes", () => {
-  const fav = calculateEloChange(1400, 800);
-  const even = calculateEloChange(1000, 1000);
-  if (fav.winnerGain >= even.winnerGain) {
-    throw new Error("favorite win should gain less");
+test("larger score margin increases change", () => {
+  const close = calculateEloChange(1000, 1000, 11, 10);
+  const blowout = calculateEloChange(1000, 1000, 20, 10);
+  if (blowout.winnerGain <= close.winnerGain) {
+    throw new Error("bigger margin should mean bigger gain");
   }
 });
 
-test("underdog loss to favorite loses less", () => {
-  const { loserLoss: underdogLoss } = calculateEloChange(1400, 800);
-  const { loserLoss: evenLoss } = calculateEloChange(1000, 1000);
-  if (underdogLoss >= evenLoss) {
-    throw new Error("underdog should lose less when favorite wins");
-  }
+test("respects minWinGain", () => {
+  const r = calculateEloChange(2000, 2000, 1, 0);
+  if (r.winnerGain < 40) throw new Error(`expected min 40, got ${r.winnerGain}`);
 });
 
-test("applyMatch returns new elos", () => {
-  const r = applyMatch(1000, 1200);
-  if (r.winnerNewElo <= 1000) throw new Error("winner should rise");
-  if (r.loserNewElo >= 1200) throw new Error("loser should fall");
+test("player changes apply to correct sides", () => {
+  const r = calculateEloChange(1000, 1200, 10, 3);
+  if (r.player1NewElo !== 1000 + r.player1Change) throw new Error("p1 elo");
+  if (r.player2NewElo !== 1200 + r.player2Change) throw new Error("p2 elo");
+  if (r.player1Change <= 0) throw new Error("player1 should gain as winner");
+  if (r.player2Change >= 0) throw new Error("player2 should lose");
 });

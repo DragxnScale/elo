@@ -1,67 +1,92 @@
-/** Flat points added to every rating change. */
-const BASE_POINTS = 10;
-
-/** Percent of a player's own ELO (5 = 5%, so +500 per 10,000 ELO before rounding). */
-const ELO_PERCENT = 5;
-
-export type EloChange = {
-  winnerGain: number;
-  loserLoss: number;
-  winnerNewElo: number;
-  loserNewElo: number;
+export type EloParams = {
+  k?: number;
+  minWinGain?: number;
+  loserLossRate?: number;
+  upsetScale?: number;
+  scoreScale?: number;
+  scorePower?: number;
+  maxScoreMultiplier?: number;
 };
 
-function pointsFromElo(elo: number): number {
-  return BASE_POINTS + (elo * ELO_PERCENT) / 100;
-}
+export type EloChangeResult = {
+  winnerGain: number;
+  loserLoss: number;
+  player1Change: number;
+  player2Change: number;
+  player1NewElo: number;
+  player2NewElo: number;
+  scoreMultiplier: number;
+  upsetMultiplier: number;
+  expectedScore: number;
+};
 
 export function calculateEloChange(
-  winnerElo: number,
-  loserElo: number
-): Pick<EloChange, "winnerGain" | "loserLoss"> {
-  let winnerGain = pointsFromElo(winnerElo);
-  let loserLoss = pointsFromElo(loserElo);
-
-  const ratingGap = loserElo - winnerElo;
-  const avgElo = (winnerElo + loserElo) / 2;
-
-  if (ratingGap > 0 && avgElo > 0) {
-    const upsetMultiplier = 1 + (ratingGap / avgElo) * 2;
-    winnerGain *= upsetMultiplier;
-    loserLoss *= upsetMultiplier * 0.9;
-  } else if (ratingGap < 0 && avgElo > 0) {
-    const favoriteMultiplier = Math.max(
-      0.35,
-      1 - (-ratingGap / avgElo) * 0.5
-    );
-    winnerGain *= favoriteMultiplier;
-    loserLoss *= favoriteMultiplier;
+  player1Elo: number,
+  player2Elo: number,
+  player1Score: number,
+  player2Score: number,
+  {
+    k = 32,
+    minWinGain = 40,
+    loserLossRate = 0.75,
+    upsetScale = 250,
+    scoreScale = 25,
+    scorePower = 0.75,
+    maxScoreMultiplier = 10,
+  }: EloParams = {}
+): EloChangeResult {
+  if (player1Score === player2Score) {
+    return {
+      player1Change: 0,
+      player2Change: 0,
+      player1NewElo: player1Elo,
+      player2NewElo: player2Elo,
+      winnerGain: 0,
+      loserLoss: 0,
+      scoreMultiplier: 1,
+      upsetMultiplier: 1,
+      expectedScore: 0.5,
+    };
   }
 
-  winnerGain = Math.round(winnerGain);
-  loserLoss = Math.round(loserLoss);
+  const player1Won = player1Score > player2Score;
 
-  winnerGain = Math.max(1, winnerGain);
-  loserLoss = Math.max(1, loserLoss);
+  const winnerElo = player1Won ? player1Elo : player2Elo;
+  const loserElo = player1Won ? player2Elo : player1Elo;
 
-  if (winnerGain <= loserLoss) {
-    loserLoss = Math.max(1, winnerGain - 2);
-  } else if (winnerGain - loserLoss < 2) {
-    loserLoss = Math.max(1, winnerGain - 2);
-  }
+  const expectedScore =
+    1 / (1 + Math.pow(10, (loserElo - winnerElo) / 400));
 
-  return { winnerGain, loserLoss };
-}
+  const baseChange = k * (1 - expectedScore);
 
-export function applyMatch(
-  winnerElo: number,
-  loserElo: number
-): EloChange {
-  const { winnerGain, loserLoss } = calculateEloChange(winnerElo, loserElo);
+  const upsetMultiplier =
+    1 + Math.max(0, loserElo - winnerElo) / upsetScale;
+
+  const scoreMargin = Math.abs(player1Score - player2Score);
+
+  const scoreMultiplier = Math.min(
+    maxScoreMultiplier,
+    1 + Math.pow(scoreMargin / scoreScale, scorePower)
+  );
+
+  const winnerGain = Math.round(
+    Math.max(minWinGain, baseChange) * upsetMultiplier * scoreMultiplier
+  );
+
+  const loserLoss = Math.round(winnerGain * loserLossRate);
+
+  const player1Change = player1Won ? winnerGain : -loserLoss;
+  const player2Change = player1Won ? -loserLoss : winnerGain;
+
   return {
     winnerGain,
     loserLoss,
-    winnerNewElo: winnerElo + winnerGain,
-    loserNewElo: loserElo - loserLoss,
+    player1Change,
+    player2Change,
+    player1NewElo: player1Elo + player1Change,
+    player2NewElo: player2Elo + player2Change,
+    scoreMultiplier,
+    upsetMultiplier,
+    expectedScore,
   };
 }
