@@ -52,11 +52,8 @@ export function AppShell() {
       <header className="relative border-b border-cyan-500/10 bg-[#050810]/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.35em] text-cyan-500/70">
-              Nexus Rank
-            </p>
             <h1 className="bg-gradient-to-r from-cyan-200 via-white to-violet-300 bg-clip-text text-3xl font-bold tracking-tight text-transparent">
-              ELO Leaderboard
+              BowlBoard
             </h1>
             <p className="mt-1 text-sm text-slate-500">
               Live ratings. Upsets rewarded. Fair losses cushioned.

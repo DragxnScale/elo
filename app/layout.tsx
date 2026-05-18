@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Nexus Rank — ELO Leaderboard",
+  title: "BowlBoard",
   description: "Live ELO leaderboards with share codes and match tracking",
 };
 
