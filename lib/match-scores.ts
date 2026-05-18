@@ -1,5 +1,8 @@
 export function formatPointsLabel(points: number): string {
-  return `${points} point${points === 1 ? "" : "s"}`;
+  const abs = Math.abs(points);
+  const unit = `point${abs === 1 ? "" : "s"}`;
+  if (points < 0) return `−${abs} ${unit}`;
+  return `${points} ${unit}`;
 }
 
 export type MatchFieldErrors = {
@@ -31,8 +34,11 @@ export function validateIntegerText(value: string, label: string): string | unde
   if (trimmed === "") {
     return `Please fill in ${label}.`;
   }
-  if (!/^\d+$/.test(trimmed)) {
-    return `${label} must be a whole number (no decimals or letters).`;
+  if (trimmed === "-" || trimmed === "+") {
+    return `${label} must be a whole number.`;
+  }
+  if (!/^-?\d+$/.test(trimmed)) {
+    return `${label} must be a whole number (negative values allowed).`;
   }
   return undefined;
 }
@@ -41,8 +47,12 @@ export function parseIntegerText(value: string): number {
   return parseInt(value.trim(), 10);
 }
 
-/** Allow only digits or empty while typing. */
+/** Allow digits, optional leading minus, or empty while typing. */
 export function sanitizeIntegerInput(value: string): string {
   if (value === "") return "";
-  return value.replace(/\D/g, "");
+  if (value === "-") return "-";
+  const negative = value.startsWith("-");
+  const digits = (negative ? value.slice(1) : value).replace(/\D/g, "");
+  if (negative) return digits === "" ? "-" : `-${digits}`;
+  return digits;
 }

@@ -289,7 +289,7 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
               Record match
             </h3>
             <p className="text-xs text-slate-500">
-              Select players and type whole-number scores.
+              Select players and type whole-number scores (negative allowed).
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -336,7 +336,7 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
                     }));
                   }}
                   className="input-futuristic w-full py-3 text-base"
-                  placeholder="e.g. 200"
+                  placeholder="e.g. 200 or -3"
                   autoComplete="off"
                 />
                 <FieldError message={fieldErrors.player1Points} />
@@ -383,7 +383,7 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
                     }));
                   }}
                   className="input-futuristic w-full py-3 text-base"
-                  placeholder="e.g. 4"
+                  placeholder="e.g. 4 or -10"
                   autoComplete="off"
                 />
                 <FieldError message={fieldErrors.player2Points} />

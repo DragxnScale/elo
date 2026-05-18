@@ -217,9 +217,6 @@ export async function applyMatchToLeaderboard(
   if (player1Id === player2Id) {
     return { error: "Pick two different players." };
   }
-  if (player1Score < 0 || player2Score < 0) {
-    return { error: "Scores cannot be negative." };
-  }
   if (player1Score === player2Score) {
     return { error: "Tie game — no ELO change." };
   }
