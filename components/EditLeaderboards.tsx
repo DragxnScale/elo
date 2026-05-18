@@ -10,14 +10,26 @@ import {
 } from "@/app/actions";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { LeaderboardTable } from "@/components/LeaderboardTable";
-import { ScoreSelect } from "@/components/ScoreSelect";
 import { calculateEloChange } from "@/lib/elo";
 import type { EloChangeResult } from "@/lib/elo";
 import {
   formatPointsLabel,
-  resolveScore,
+  parseIntegerText,
+  sanitizeIntegerInput,
+  validateIntegerText,
+  validateRequiredText,
+  type MatchFieldErrors,
 } from "@/lib/match-scores";
 import type { Leaderboard, Player } from "@/lib/types";
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+      {message}
+    </p>
+  );
+}
 
 type EditLeaderboardsProps = {
   isAuthenticated: boolean;
@@ -38,12 +50,11 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [newPlayerName, setNewPlayerName] = useState("");
-  const [player1Id, setPlayer1Id] = useState("");
-  const [player2Id, setPlayer2Id] = useState("");
-  const [player1ScoreKey, setPlayer1ScoreKey] = useState("200");
-  const [player2ScoreKey, setPlayer2ScoreKey] = useState("4");
-  const [player1CustomScore, setPlayer1CustomScore] = useState("");
-  const [player2CustomScore, setPlayer2CustomScore] = useState("");
+  const [player1Name, setPlayer1Name] = useState("");
+  const [player2Name, setPlayer2Name] = useState("");
+  const [player1Points, setPlayer1Points] = useState("");
+  const [player2Points, setPlayer2Points] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<MatchFieldErrors>({});
   const [pending, setPending] = useState<PendingPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -62,19 +73,67 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
   async function loadPlayers(id: string) {
     const { players: data } = await getPlayers(id);
     setPlayers(data as Player[]);
-    setPlayer1Id("");
-    setPlayer2Id("");
-    setPlayer1ScoreKey("200");
-    setPlayer2ScoreKey("4");
-    setPlayer1CustomScore("");
-    setPlayer2CustomScore("");
+    setPlayer1Name("");
+    setPlayer2Name("");
+    setPlayer1Points("");
+    setPlayer2Points("");
+    setFieldErrors({});
     setPending(null);
   }
 
-  const p1 = players.find((pl) => pl.id === player1Id);
-  const p2 = players.find((pl) => pl.id === player2Id);
-  const resolved1 = resolveScore(player1ScoreKey, player1CustomScore);
-  const resolved2 = resolveScore(player2ScoreKey, player2CustomScore);
+  function findPlayerByName(name: string): Player | undefined {
+    const key = name.trim().toLowerCase();
+    return players.find((p) => p.name.trim().toLowerCase() === key);
+  }
+
+  function validateMatchFields(): {
+    errors: MatchFieldErrors;
+    player1?: Player;
+    player2?: Player;
+    score1?: number;
+    score2?: number;
+  } {
+    const errors: MatchFieldErrors = {};
+
+    const name1Err = validateRequiredText(player1Name, "Player 1 name");
+    const name2Err = validateRequiredText(player2Name, "Player 2 name");
+    const pts1Err = validateIntegerText(player1Points, "Player 1 points");
+    const pts2Err = validateIntegerText(player2Points, "Player 2 points");
+
+    if (name1Err) errors.player1Name = name1Err;
+    if (name2Err) errors.player2Name = name2Err;
+    if (pts1Err) errors.player1Points = pts1Err;
+    if (pts2Err) errors.player2Points = pts2Err;
+
+    const player1 = !name1Err ? findPlayerByName(player1Name) : undefined;
+    const player2 = !name2Err ? findPlayerByName(player2Name) : undefined;
+
+    if (!name1Err && !player1) {
+      errors.player1Name = `"${player1Name.trim()}" is not on this leaderboard.`;
+    }
+    if (!name2Err && !player2) {
+      errors.player2Name = `"${player2Name.trim()}" is not on this leaderboard.`;
+    }
+    if (
+      player1 &&
+      player2 &&
+      player1.id === player2.id
+    ) {
+      errors.player2Name = "Players must be different.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      return { errors };
+    }
+
+    return {
+      errors: {},
+      player1: player1!,
+      player2: player2!,
+      score1: parseIntegerText(player1Points),
+      score2: parseIntegerText(player2Points),
+    };
+  }
 
   useEffect(() => {
     if (isAuthenticated) loadBoards();
@@ -99,40 +158,39 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
     }
   }
 
-  function parseScores(): { s1: number; s2: number } | null {
-    if (resolved1 === null || resolved2 === null) {
-      setError("Pick valid point totals for both players.");
-      return null;
-    }
-    return { s1: resolved1, s2: resolved2 };
-  }
-
   function previewMatch() {
-    if (!player1Id || !player2Id || player1Id === player2Id) {
-      setError("Pick two different players.");
+    const validated = validateMatchFields();
+    setFieldErrors(validated.errors);
+
+    if (
+      !validated.player1 ||
+      !validated.player2 ||
+      validated.score1 === undefined ||
+      validated.score2 === undefined
+    ) {
+      setPending(null);
       return;
     }
-    const scores = parseScores();
-    if (!scores) return;
 
-    const p1 = players.find((p) => p.id === player1Id);
-    const p2 = players.find((p) => p.id === player2Id);
-    if (!p1 || !p2) return;
-
-    if (scores.s1 === scores.s2) {
+    if (validated.score1 === validated.score2) {
       setError("Tie game — no ELO change.");
       setPending(null);
       return;
     }
 
-    const result = calculateEloChange(p1.elo, p2.elo, scores.s1, scores.s2);
+    const result = calculateEloChange(
+      validated.player1.elo,
+      validated.player2.elo,
+      validated.score1,
+      validated.score2
+    );
     setPending({
-      player1Id,
-      player2Id,
-      player1Name: p1.name,
-      player2Name: p2.name,
-      player1Score: scores.s1,
-      player2Score: scores.s2,
+      player1Id: validated.player1.id,
+      player2Id: validated.player2.id,
+      player1Name: validated.player1.name,
+      player2Name: validated.player2.name,
+      player1Score: validated.score1,
+      player2Score: validated.score2,
       result,
     });
     setError(null);
@@ -241,92 +299,93 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
             <h3 className="text-sm font-medium uppercase tracking-wider text-slate-500">
               Record match
             </h3>
+            <p className="text-xs text-slate-500">
+              Type exact player names from the board and whole-number scores.
+            </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-xs font-medium text-slate-500">
-                  Player 1
+                  Player 1 name
                 </label>
-                <select
-                  value={player1Id}
+                <input
+                  type="text"
+                  value={player1Name}
                   onChange={(e) => {
-                    setPlayer1Id(e.target.value);
+                    setPlayer1Name(e.target.value);
                     setPending(null);
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      player1Name: undefined,
+                    }));
                   }}
-                  className="input-futuristic select-match w-full"
-                >
-                  <option value="">Select player…</option>
-                  {players.map((p) => (
-                    <option key={p.id} value={p.id} disabled={p.id === player2Id}>
-                      {p.name} ({p.elo} ELO)
-                    </option>
-                  ))}
-                </select>
-                <ScoreSelect
-                  id="p1-points"
-                  value={player1ScoreKey}
-                  customValue={player1CustomScore}
-                  onValueChange={(v) => {
-                    setPlayer1ScoreKey(v);
-                    setPending(null);
-                  }}
-                  onCustomChange={(v) => {
-                    setPlayer1CustomScore(v);
-                    setPending(null);
-                  }}
+                  className="input-futuristic w-full py-3 text-base"
+                  placeholder="e.g. a"
+                  autoComplete="off"
                 />
+                <FieldError message={fieldErrors.player1Name} />
+                <label className="text-xs font-medium text-slate-500">
+                  Player 1 points
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={player1Points}
+                  onChange={(e) => {
+                    setPlayer1Points(sanitizeIntegerInput(e.target.value));
+                    setPending(null);
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      player1Points: undefined,
+                    }));
+                  }}
+                  className="input-futuristic w-full py-3 text-base"
+                  placeholder="e.g. 200"
+                  autoComplete="off"
+                />
+                <FieldError message={fieldErrors.player1Points} />
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-medium text-slate-500">
-                  Player 2
+                  Player 2 name
                 </label>
-                <select
-                  value={player2Id}
+                <input
+                  type="text"
+                  value={player2Name}
                   onChange={(e) => {
-                    setPlayer2Id(e.target.value);
+                    setPlayer2Name(e.target.value);
                     setPending(null);
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      player2Name: undefined,
+                    }));
                   }}
-                  className="input-futuristic select-match w-full"
-                >
-                  <option value="">Select player…</option>
-                  {players
-                    .filter((p) => p.id !== player1Id)
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.elo} ELO)
-                      </option>
-                    ))}
-                </select>
-                <ScoreSelect
-                  id="p2-points"
-                  value={player2ScoreKey}
-                  customValue={player2CustomScore}
-                  onValueChange={(v) => {
-                    setPlayer2ScoreKey(v);
-                    setPending(null);
-                  }}
-                  onCustomChange={(v) => {
-                    setPlayer2CustomScore(v);
-                    setPending(null);
-                  }}
+                  className="input-futuristic w-full py-3 text-base"
+                  placeholder="e.g. b"
+                  autoComplete="off"
                 />
+                <FieldError message={fieldErrors.player2Name} />
+                <label className="text-xs font-medium text-slate-500">
+                  Player 2 points
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={player2Points}
+                  onChange={(e) => {
+                    setPlayer2Points(sanitizeIntegerInput(e.target.value));
+                    setPending(null);
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      player2Points: undefined,
+                    }));
+                  }}
+                  className="input-futuristic w-full py-3 text-base"
+                  placeholder="e.g. 4"
+                  autoComplete="off"
+                />
+                <FieldError message={fieldErrors.player2Points} />
               </div>
             </div>
-
-            {p1 && p2 && resolved1 !== null && resolved2 !== null && (
-              <p className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-4 py-3 text-center text-sm text-cyan-100/90">
-                <span className="font-semibold text-cyan-200">{p1.name}</span>{" "}
-                with{" "}
-                <span className="font-mono text-cyan-300">
-                  {formatPointsLabel(resolved1)}
-                </span>
-                <span className="mx-2 text-slate-500">vs</span>
-                <span className="font-semibold text-cyan-200">{p2.name}</span>{" "}
-                with{" "}
-                <span className="font-mono text-cyan-300">
-                  {formatPointsLabel(resolved2)}
-                </span>
-              </p>
-            )}
 
             <button
               type="button"
