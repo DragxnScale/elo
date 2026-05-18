@@ -1,8 +1,8 @@
 /** Flat points added to every rating change. */
 const BASE_POINTS = 10;
 
-/** Percent of a player's own ELO (0.08 = 0.08%, so +8 per 10,000 ELO). */
-const ELO_PERCENT = 0.08;
+/** Percent of a player's own ELO (5 = 5%, so +500 per 10,000 ELO before rounding). */
+const ELO_PERCENT = 5;
 
 export type EloChange = {
   winnerGain: number;
