@@ -17,7 +17,7 @@ import {
   parseIntegerText,
   sanitizeIntegerInput,
   validateIntegerText,
-  validateRequiredText,
+  validatePlayerSelect,
   type MatchFieldErrors,
 } from "@/lib/match-scores";
 import type { Leaderboard, Player } from "@/lib/types";
@@ -50,8 +50,8 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [newPlayerName, setNewPlayerName] = useState("");
-  const [player1Name, setPlayer1Name] = useState("");
-  const [player2Name, setPlayer2Name] = useState("");
+  const [player1Id, setPlayer1Id] = useState("");
+  const [player2Id, setPlayer2Id] = useState("");
   const [player1Points, setPlayer1Points] = useState("");
   const [player2Points, setPlayer2Points] = useState("");
   const [fieldErrors, setFieldErrors] = useState<MatchFieldErrors>({});
@@ -73,17 +73,12 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
   async function loadPlayers(id: string) {
     const { players: data } = await getPlayers(id);
     setPlayers(data as Player[]);
-    setPlayer1Name("");
-    setPlayer2Name("");
+    setPlayer1Id("");
+    setPlayer2Id("");
     setPlayer1Points("");
     setPlayer2Points("");
     setFieldErrors({});
     setPending(null);
-  }
-
-  function findPlayerByName(name: string): Player | undefined {
-    const key = name.trim().toLowerCase();
-    return players.find((p) => p.name.trim().toLowerCase() === key);
   }
 
   function validateMatchFields(): {
@@ -95,31 +90,25 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
   } {
     const errors: MatchFieldErrors = {};
 
-    const name1Err = validateRequiredText(player1Name, "Player 1 name");
-    const name2Err = validateRequiredText(player2Name, "Player 2 name");
+    const player1Err = validatePlayerSelect(player1Id, "Player 1");
+    const player2Err = validatePlayerSelect(player2Id, "Player 2");
     const pts1Err = validateIntegerText(player1Points, "Player 1 points");
     const pts2Err = validateIntegerText(player2Points, "Player 2 points");
 
-    if (name1Err) errors.player1Name = name1Err;
-    if (name2Err) errors.player2Name = name2Err;
+    if (player1Err) errors.player1 = player1Err;
+    if (player2Err) errors.player2 = player2Err;
     if (pts1Err) errors.player1Points = pts1Err;
     if (pts2Err) errors.player2Points = pts2Err;
 
-    const player1 = !name1Err ? findPlayerByName(player1Name) : undefined;
-    const player2 = !name2Err ? findPlayerByName(player2Name) : undefined;
+    const player1 = !player1Err
+      ? players.find((p) => p.id === player1Id)
+      : undefined;
+    const player2 = !player2Err
+      ? players.find((p) => p.id === player2Id)
+      : undefined;
 
-    if (!name1Err && !player1) {
-      errors.player1Name = `"${player1Name.trim()}" is not on this leaderboard.`;
-    }
-    if (!name2Err && !player2) {
-      errors.player2Name = `"${player2Name.trim()}" is not on this leaderboard.`;
-    }
-    if (
-      player1 &&
-      player2 &&
-      player1.id === player2.id
-    ) {
-      errors.player2Name = "Players must be different.";
+    if (player1 && player2 && player1.id === player2.id) {
+      errors.player2 = "Players must be different.";
     }
 
     if (Object.keys(errors).length > 0) {
@@ -300,29 +289,37 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
               Record match
             </h3>
             <p className="text-xs text-slate-500">
-              Type exact player names from the board and whole-number scores.
+              Select players and type whole-number scores.
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-xs font-medium text-slate-500">
-                  Player 1 name
+                  Player 1
                 </label>
-                <input
-                  type="text"
-                  value={player1Name}
+                <select
+                  value={player1Id}
                   onChange={(e) => {
-                    setPlayer1Name(e.target.value);
+                    setPlayer1Id(e.target.value);
                     setPending(null);
                     setFieldErrors((prev) => ({
                       ...prev,
-                      player1Name: undefined,
+                      player1: undefined,
                     }));
                   }}
-                  className="input-futuristic w-full py-3 text-base"
-                  placeholder="e.g. a"
-                  autoComplete="off"
-                />
-                <FieldError message={fieldErrors.player1Name} />
+                  className="input-futuristic select-match w-full"
+                >
+                  <option value="">Select player…</option>
+                  {players.map((pl) => (
+                    <option
+                      key={pl.id}
+                      value={pl.id}
+                      disabled={pl.id === player2Id}
+                    >
+                      {pl.name} ({pl.elo} ELO)
+                    </option>
+                  ))}
+                </select>
+                <FieldError message={fieldErrors.player1} />
                 <label className="text-xs font-medium text-slate-500">
                   Player 1 points
                 </label>
@@ -346,24 +343,30 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-medium text-slate-500">
-                  Player 2 name
+                  Player 2
                 </label>
-                <input
-                  type="text"
-                  value={player2Name}
+                <select
+                  value={player2Id}
                   onChange={(e) => {
-                    setPlayer2Name(e.target.value);
+                    setPlayer2Id(e.target.value);
                     setPending(null);
                     setFieldErrors((prev) => ({
                       ...prev,
-                      player2Name: undefined,
+                      player2: undefined,
                     }));
                   }}
-                  className="input-futuristic w-full py-3 text-base"
-                  placeholder="e.g. b"
-                  autoComplete="off"
-                />
-                <FieldError message={fieldErrors.player2Name} />
+                  className="input-futuristic select-match w-full"
+                >
+                  <option value="">Select player…</option>
+                  {players
+                    .filter((pl) => pl.id !== player1Id)
+                    .map((pl) => (
+                      <option key={pl.id} value={pl.id}>
+                        {pl.name} ({pl.elo} ELO)
+                      </option>
+                    ))}
+                </select>
+                <FieldError message={fieldErrors.player2} />
                 <label className="text-xs font-medium text-slate-500">
                   Player 2 points
                 </label>

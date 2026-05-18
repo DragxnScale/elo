@@ -3,11 +3,21 @@ export function formatPointsLabel(points: number): string {
 }
 
 export type MatchFieldErrors = {
-  player1Name?: string;
-  player2Name?: string;
+  player1?: string;
+  player2?: string;
   player1Points?: string;
   player2Points?: string;
 };
+
+export function validatePlayerSelect(
+  value: string,
+  label: string
+): string | undefined {
+  if (!value) {
+    return `Please select ${label}.`;
+  }
+  return undefined;
+}
 
 export function validateRequiredText(value: string, label: string): string | undefined {
   if (value.trim() === "") {

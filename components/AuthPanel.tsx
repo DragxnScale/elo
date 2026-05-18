@@ -15,16 +15,9 @@ import { signOut } from "@/app/actions";
 type AuthPanelProps = {
   username: string | null;
   onAuthChange: () => void;
-  onCreateMatch?: () => void;
-  canCreateMatch?: boolean;
 };
 
-export function AuthPanel({
-  username,
-  onAuthChange,
-  onCreateMatch,
-  canCreateMatch = false,
-}: AuthPanelProps) {
+export function AuthPanel({ username, onAuthChange }: AuthPanelProps) {
   const router = useRouter();
   const [modal, setModal] = useState<"signin" | "signup" | null>(null);
   const [user, setUser] = useState("");
@@ -124,11 +117,6 @@ export function AuthPanel({
         <span className="hidden text-sm text-slate-400 sm:inline">
           <span className="font-mono text-cyan-300">@{username}</span>
         </span>
-        {canCreateMatch && onCreateMatch && (
-          <button type="button" onClick={onCreateMatch} className="btn-secondary">
-            Create match
-          </button>
-        )}
         <button
           type="button"
           onClick={async () => {
