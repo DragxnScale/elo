@@ -10,8 +10,13 @@ import {
 } from "@/app/actions";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { LeaderboardTable } from "@/components/LeaderboardTable";
+import { ScoreSelect } from "@/components/ScoreSelect";
 import { calculateEloChange } from "@/lib/elo";
 import type { EloChangeResult } from "@/lib/elo";
+import {
+  formatPointsLabel,
+  resolveScore,
+} from "@/lib/match-scores";
 import type { Leaderboard, Player } from "@/lib/types";
 
 type EditLeaderboardsProps = {
@@ -35,8 +40,10 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
   const [newPlayerName, setNewPlayerName] = useState("");
   const [player1Id, setPlayer1Id] = useState("");
   const [player2Id, setPlayer2Id] = useState("");
-  const [player1Score, setPlayer1Score] = useState("1");
-  const [player2Score, setPlayer2Score] = useState("0");
+  const [player1ScoreKey, setPlayer1ScoreKey] = useState("200");
+  const [player2ScoreKey, setPlayer2ScoreKey] = useState("4");
+  const [player1CustomScore, setPlayer1CustomScore] = useState("");
+  const [player2CustomScore, setPlayer2CustomScore] = useState("");
   const [pending, setPending] = useState<PendingPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -57,10 +64,17 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
     setPlayers(data as Player[]);
     setPlayer1Id("");
     setPlayer2Id("");
-    setPlayer1Score("1");
-    setPlayer2Score("0");
+    setPlayer1ScoreKey("200");
+    setPlayer2ScoreKey("4");
+    setPlayer1CustomScore("");
+    setPlayer2CustomScore("");
     setPending(null);
   }
+
+  const p1 = players.find((pl) => pl.id === player1Id);
+  const p2 = players.find((pl) => pl.id === player2Id);
+  const resolved1 = resolveScore(player1ScoreKey, player1CustomScore);
+  const resolved2 = resolveScore(player2ScoreKey, player2CustomScore);
 
   useEffect(() => {
     if (isAuthenticated) loadBoards();
@@ -86,13 +100,11 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
   }
 
   function parseScores(): { s1: number; s2: number } | null {
-    const s1 = Number(player1Score);
-    const s2 = Number(player2Score);
-    if (!Number.isFinite(s1) || !Number.isFinite(s2) || s1 < 0 || s2 < 0) {
-      setError("Enter valid scores (0 or higher).");
+    if (resolved1 === null || resolved2 === null) {
+      setError("Pick valid point totals for both players.");
       return null;
     }
-    return { s1, s2 };
+    return { s1: resolved1, s2: resolved2 };
   }
 
   function previewMatch() {
@@ -249,17 +261,18 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
                     </option>
                   ))}
                 </select>
-                <input
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={player1Score}
-                  onChange={(e) => {
-                    setPlayer1Score(e.target.value);
+                <ScoreSelect
+                  id="p1-points"
+                  value={player1ScoreKey}
+                  customValue={player1CustomScore}
+                  onValueChange={(v) => {
+                    setPlayer1ScoreKey(v);
                     setPending(null);
                   }}
-                  className="input-futuristic w-full py-3 text-base"
-                  placeholder="Score"
+                  onCustomChange={(v) => {
+                    setPlayer1CustomScore(v);
+                    setPending(null);
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -283,20 +296,38 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
                       </option>
                     ))}
                 </select>
-                <input
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={player2Score}
-                  onChange={(e) => {
-                    setPlayer2Score(e.target.value);
+                <ScoreSelect
+                  id="p2-points"
+                  value={player2ScoreKey}
+                  customValue={player2CustomScore}
+                  onValueChange={(v) => {
+                    setPlayer2ScoreKey(v);
                     setPending(null);
                   }}
-                  className="input-futuristic w-full py-3 text-base"
-                  placeholder="Score"
+                  onCustomChange={(v) => {
+                    setPlayer2CustomScore(v);
+                    setPending(null);
+                  }}
                 />
               </div>
             </div>
+
+            {p1 && p2 && resolved1 !== null && resolved2 !== null && (
+              <p className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-4 py-3 text-center text-sm text-cyan-100/90">
+                <span className="font-semibold text-cyan-200">{p1.name}</span>{" "}
+                with{" "}
+                <span className="font-mono text-cyan-300">
+                  {formatPointsLabel(resolved1)}
+                </span>
+                <span className="mx-2 text-slate-500">vs</span>
+                <span className="font-semibold text-cyan-200">{p2.name}</span>{" "}
+                with{" "}
+                <span className="font-mono text-cyan-300">
+                  {formatPointsLabel(resolved2)}
+                </span>
+              </p>
+            )}
+
             <button
               type="button"
               onClick={previewMatch}
@@ -309,8 +340,10 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
             {pending && (
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5 sm:p-6">
                 <p className="text-lg font-semibold text-emerald-200">
-                  {pending.player1Name} {pending.player1Score} –{" "}
-                  {pending.player2Score} {pending.player2Name}
+                  {pending.player1Name} with{" "}
+                  {formatPointsLabel(pending.player1Score)} vs{" "}
+                  {pending.player2Name} with{" "}
+                  {formatPointsLabel(pending.player2Score)}
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
                   Score margin ×{pending.result.scoreMultiplier.toFixed(2)} ·
