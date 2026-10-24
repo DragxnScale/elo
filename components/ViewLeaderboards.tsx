@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getMyLeaderboards, getLeaderboardByCode } from "@/app/actions";
+import {
+  getBoardsIPlayIn,
+  getMyLeaderboards,
+  getLeaderboardByCode,
+} from "@/app/actions";
 import { LeaderboardTable } from "@/components/LeaderboardTable";
 import { isValidShareCode, normalizeShareCode } from "@/lib/codes";
 import type { Leaderboard } from "@/lib/types";
@@ -23,8 +27,13 @@ export function ViewLeaderboards({ isAuthenticated }: ViewLeaderboardsProps) {
       setMine([]);
       return;
     }
-    const { leaderboards } = await getMyLeaderboards();
-    setMine(leaderboards as Leaderboard[]);
+    const [{ leaderboards: owned }, { leaderboards: playing }] =
+      await Promise.all([getMyLeaderboards(), getBoardsIPlayIn()]);
+    const seen = new Set<string>();
+    const leaderboards = [...(owned as Leaderboard[]), ...playing].filter(
+      (lb) => !seen.has(lb.id) && !!seen.add(lb.id)
+    );
+    setMine(leaderboards);
     if (leaderboards.length > 0 && !selectedId && !external) {
       setSelectedId(leaderboards[0]!.id);
     }

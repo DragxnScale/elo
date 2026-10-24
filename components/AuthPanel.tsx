@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -114,9 +115,13 @@ export function AuthPanel({ username, onAuthChange }: AuthPanelProps) {
   if (username) {
     return (
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <span className="hidden text-sm text-slate-400 sm:inline">
+        <Link
+          href={`/u/${username}`}
+          className="rounded-lg px-3 py-2 text-sm text-slate-400 transition hover:text-cyan-300"
+        >
           <span className="font-mono text-cyan-300">@{username}</span>
-        </span>
+          <span className="ml-2 hidden sm:inline">My stats</span>
+        </Link>
         <button
           type="button"
           onClick={async () => {

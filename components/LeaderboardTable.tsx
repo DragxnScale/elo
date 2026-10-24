@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Player } from "@/lib/types";
-import { getPlayers } from "@/app/actions";
+import { getMatches, getPlayers } from "@/app/actions";
+import { formatWinRate, recordsByPlayer } from "@/lib/stats";
 
 type LeaderboardTableProps = {
   leaderboardId: string;
@@ -15,11 +17,18 @@ export function LeaderboardTable({
   shareCode,
 }: LeaderboardTableProps) {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [records, setRecords] = useState<
+    Map<string, { wins: number; losses: number }>
+  >(new Map());
   const [loading, setLoading] = useState(true);
 
   async function load() {
-    const { players: data } = await getPlayers(leaderboardId);
+    const [{ players: data }, { matches }] = await Promise.all([
+      getPlayers(leaderboardId),
+      getMatches(leaderboardId, 1000),
+    ]);
     setPlayers(data as Player[]);
+    setRecords(recordsByPlayer(matches));
     setLoading(false);
   }
 
@@ -80,11 +89,16 @@ export function LeaderboardTable({
           <tr className="border-b border-cyan-500/20 bg-slate-900/50 text-xs uppercase tracking-wider text-slate-500">
             <th className="px-4 py-3 w-16">#</th>
             <th className="px-4 py-3">Player</th>
+            <th className="px-4 py-3 text-right">W–L</th>
+            <th className="hidden px-4 py-3 text-right sm:table-cell">Win %</th>
             <th className="px-4 py-3 text-right">ELO</th>
           </tr>
         </thead>
         <tbody>
-          {players.map((player, index) => (
+          {players.map((player, index) => {
+            const record = records.get(player.id) ?? { wins: 0, losses: 0 };
+            const played = record.wins + record.losses;
+            return (
             <tr
               key={player.id}
               className="border-b border-slate-800/80 transition-colors hover:bg-cyan-500/5"
@@ -93,13 +107,22 @@ export function LeaderboardTable({
                 {index + 1}
               </td>
               <td className="px-4 py-3 font-medium text-slate-100">
-                {player.name}
+                <Link href={`/p/${player.id}`} className="hover:underline">
+                  {player.name}
+                </Link>
+              </td>
+              <td className="px-4 py-3 text-right font-mono text-slate-300">
+                {record.wins}–{record.losses}
+              </td>
+              <td className="hidden px-4 py-3 text-right font-mono text-slate-400 sm:table-cell">
+                {formatWinRate(played ? record.wins / played : null)}
               </td>
               <td className="px-4 py-3 text-right font-mono text-cyan-300">
                 {player.elo}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
       <p className="px-4 py-2 text-center text-[10px] uppercase tracking-widest text-emerald-500/70">

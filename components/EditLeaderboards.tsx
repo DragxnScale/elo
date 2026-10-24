@@ -7,6 +7,7 @@ import {
   deleteLeaderboard,
   getMyLeaderboards,
   getPlayers,
+  linkPlayerToAccount,
 } from "@/app/actions";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { LeaderboardTable } from "@/components/LeaderboardTable";
@@ -50,6 +51,8 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [newPlayerName, setNewPlayerName] = useState("");
+  const [newPlayerUsername, setNewPlayerUsername] = useState("");
+  const [linkDrafts, setLinkDrafts] = useState<Record<string, string>>({});
   const [player1Id, setPlayer1Id] = useState("");
   const [player2Id, setPlayer2Id] = useState("");
   const [player1Points, setPlayer1Points] = useState("");
@@ -137,11 +140,12 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
     if (!selectedId) return;
     setLoading(true);
     setError(null);
-    const result = await addPlayer(selectedId, newPlayerName);
+    const result = await addPlayer(selectedId, newPlayerName, newPlayerUsername);
     setLoading(false);
     if (result.error) setError(result.error);
     else {
       setNewPlayerName("");
+      setNewPlayerUsername("");
       await loadPlayers(selectedId);
       setTableKey((k) => k + 1);
     }
@@ -203,6 +207,24 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
     setPending(null);
     await loadPlayers(selectedId);
     setTableKey((k) => k + 1);
+  }
+
+  async function saveLink(player: Player, username: string | null) {
+    if (!selectedId) return;
+    setLoading(true);
+    setError(null);
+    const result = await linkPlayerToAccount(player.id, username);
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setLinkDrafts((d) => {
+      const next = { ...d };
+      delete next[player.id];
+      return next;
+    });
+    await loadPlayers(selectedId);
   }
 
   async function confirmDeleteBoard() {
@@ -279,10 +301,74 @@ export function EditLeaderboards({ isAuthenticated }: EditLeaderboardsProps) {
               placeholder="Player name"
               required
             />
+            <input
+              value={newPlayerUsername}
+              onChange={(e) => setNewPlayerUsername(e.target.value)}
+              className="input-futuristic flex-1 min-w-[160px]"
+              placeholder="Account username (optional)"
+              autoComplete="off"
+              autoCapitalize="none"
+            />
             <button type="submit" disabled={loading} className="btn-primary">
               Add player
             </button>
           </form>
+
+          {players.length > 0 && (
+            <section className="rounded-xl border border-cyan-500/20 bg-slate-900/30 p-4 space-y-3">
+              <h3 className="text-sm font-medium uppercase tracking-wider text-slate-500">
+                Linked accounts
+              </h3>
+              <p className="text-xs text-slate-500">
+                Link a player to someone&apos;s account so this board shows up
+                in their stats.
+              </p>
+              <ul className="divide-y divide-slate-800">
+                {players.map((pl) => {
+                  const draft = linkDrafts[pl.id];
+                  return (
+                    <li key={pl.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
+                      <span className="min-w-[8rem] flex-1 text-slate-200">{pl.name}</span>
+                      {pl.user_id && draft === undefined ? (
+                        <>
+                          <span className="text-xs text-emerald-400/80">Linked</span>
+                          <button
+                            type="button"
+                            disabled={loading}
+                            onClick={() => saveLink(pl, null)}
+                            className="text-xs text-slate-500 hover:text-red-300"
+                          >
+                            Unlink
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <input
+                            value={draft ?? ""}
+                            onChange={(e) =>
+                              setLinkDrafts((d) => ({ ...d, [pl.id]: e.target.value }))
+                            }
+                            className="input-futuristic w-44"
+                            placeholder="username"
+                            autoComplete="off"
+                            autoCapitalize="none"
+                          />
+                          <button
+                            type="button"
+                            disabled={loading || !draft?.trim()}
+                            onClick={() => saveLink(pl, draft ?? "")}
+                            className="btn-secondary"
+                          >
+                            Link
+                          </button>
+                        </>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
 
           <section className="rounded-xl border border-violet-500/20 bg-slate-900/30 p-5 space-y-5 sm:p-6">
             <h3 className="text-sm font-medium uppercase tracking-wider text-slate-500">
