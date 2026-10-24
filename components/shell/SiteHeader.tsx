@@ -1,6 +1,5 @@
 "use client";
 
-import DotField from "@/components/kokonutui/dot-field";
 import { AuthPanel } from "@/components/AuthPanel";
 import { Container } from "@/components/ui/container";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -12,20 +11,17 @@ type SiteHeaderProps = {
   onAuthChange: () => void;
 };
 
-/** Wordmark, tagline and account controls over the Dot Field texture. */
+/** Wordmark, tagline and account controls. The Dot Field lives in the root layout. */
 export function SiteHeader({
   username,
   authReady,
   onAuthChange,
 }: SiteHeaderProps) {
   return (
-    <DotField
-      spacing={16}
-      className="min-h-0 items-stretch border-b border-border bg-transparent dark:bg-transparent text-border-strong dark:text-border-strong"
-    >
+    <div className="border-b border-border">
       <Container
         as="header"
-        className="relative flex flex-col gap-5 py-8 sm:py-10 md:flex-row md:items-center md:justify-between"
+        className="relative flex flex-col gap-4 py-6 sm:gap-5 sm:py-10 md:flex-row md:items-center md:justify-between"
       >
         <div className="min-w-0">
           <h1 className="text-xl font-semibold tracking-tight text-foreground">
@@ -44,6 +40,6 @@ export function SiteHeader({
           <ThemeToggle className="ml-auto md:ml-0" />
         </div>
       </Container>
-    </DotField>
+    </div>
   );
 }

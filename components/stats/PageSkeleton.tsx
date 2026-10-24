@@ -10,6 +10,7 @@ export function PageSkeleton({
   label,
   headline = false,
   stats,
+  backLink = true,
 }: {
   /** Screen-reader status text. */
   label: string;
@@ -17,6 +18,8 @@ export function PageSkeleton({
   headline?: boolean;
   /** Number of stat cells. */
   stats: number;
+  /** The player page has a back link above the title; the profile does not. */
+  backLink?: boolean;
 }) {
   return (
     <Container as="main" aria-busy="true" className="space-y-10 py-8 sm:py-12">
@@ -25,9 +28,11 @@ export function PageSkeleton({
       </p>
       <div className="space-y-8">
         <div className="space-y-3">
-          <div className="flex h-10 items-center">
-            <Skeleton className="h-4 w-24" />
-          </div>
+          {backLink && (
+            <div className="flex h-10 items-center">
+              <Skeleton className="h-4 w-24" />
+            </div>
+          )}
           <div className="space-y-1.5">
             <Skeleton className="h-8 w-48" />
             <Skeleton className="h-5 w-56 max-w-full" />

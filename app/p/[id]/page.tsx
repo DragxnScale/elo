@@ -2,7 +2,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getPlayerDetail } from "@/app/actions";
-import ActivityTerrain from "@/components/kokonutui/activity-terrain";
+import { ActivityCard } from "@/components/stats/ActivityCard";
 import { BackLink } from "@/components/stats/BackLink";
 import { EloSparkline } from "@/components/stats/EloSparkline";
 import { HeadToHeadTable } from "@/components/stats/HeadToHeadTable";
@@ -82,12 +82,9 @@ export default async function PlayerPage({ params }: Props) {
 
       {activity.data.some((n) => n > 0) && (
         <Section title="Activity">
-          <ActivityTerrain
+          <ActivityCard
             data={activity.data}
             endDate={activity.endDate}
-            title="Matches played"
-            unit={["match", "matches"]}
-            defaultFlat
             className="terrain-theme max-w-none"
           />
         </Section>

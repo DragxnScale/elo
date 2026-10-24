@@ -24,6 +24,11 @@ export interface DotFieldProps {
   interactive?: boolean;
   /** Seed for the halftone pattern, so a page always opens on the same one. */
   seed?: number;
+  /**
+   * Pin the dots to the viewport instead of the element, so the field can
+   * sit behind a whole scrolling page without a page-sized canvas.
+   */
+  fixed?: boolean;
 }
 
 // Width of a light or dark patch in the idle halftone, in px.
@@ -462,6 +467,7 @@ export default function DotField({
   spacing = 16,
   interactive = true,
   seed = 7,
+  fixed = false,
 }: DotFieldProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -712,7 +718,10 @@ export default function DotField({
       ref={rootRef}
     >
       {/* Faded out at the edges so the field sits into the page around it. */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+      <div
+        aria-hidden="true"
+        className={cn("pointer-events-none inset-0", fixed ? "fixed" : "absolute")}
+      >
         <canvas
           className="h-full w-full opacity-0 transition-opacity duration-500 ease-out"
           ref={canvasRef}

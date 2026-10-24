@@ -847,7 +847,7 @@ export default function ActivityTerrain({
           <p className="font-medium text-sm">{title}</p>
           <p
             aria-live="polite"
-            className="mt-0.5 truncate text-sm text-zinc-500 tabular-nums dark:text-zinc-400"
+            className="mt-0.5 text-pretty text-sm text-zinc-500 tabular-nums dark:text-zinc-400"
           >
             {readout}
           </p>

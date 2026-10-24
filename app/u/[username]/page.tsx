@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getProfileDetail } from "@/app/actions";
-import ActivityTerrain from "@/components/kokonutui/activity-terrain";
-import { BackLink } from "@/components/stats/BackLink";
+import { ActivityCard } from "@/components/stats/ActivityCard";
 import { EloSparkline } from "@/components/stats/EloSparkline";
 import { formatMonthYear } from "@/components/stats/format";
 import { MatchList } from "@/components/stats/MatchList";
@@ -58,7 +57,6 @@ export default async function ProfilePage({ params }: Props) {
 
   const lead = (
     <div className="space-y-3">
-      <BackLink href="/">BowlBoard</BackLink>
       <div className="space-y-1.5">
         <h1 className="break-words text-2xl font-semibold tracking-tight">@{profile.username}</h1>
         <p className="text-sm text-muted-foreground">{meta}</p>
@@ -128,11 +126,9 @@ export default async function ProfilePage({ params }: Props) {
 
       {activity.data.some((n) => n > 0) && (
         <Section title="Activity">
-          <ActivityTerrain
+          <ActivityCard
             data={activity.data}
             endDate={activity.endDate}
-            title="Matches played"
-            unit={["match", "matches"]}
             className="terrain-theme max-w-none"
           />
         </Section>
