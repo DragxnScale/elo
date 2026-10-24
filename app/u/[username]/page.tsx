@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProfileDetail } from "@/app/actions";
 import ActivityTerrain from "@/components/kokonutui/activity-terrain";
+import { BackLink } from "@/components/stats/BackLink";
 import { EloSparkline } from "@/components/stats/EloSparkline";
+import { formatMonthYear } from "@/components/stats/format";
 import { MatchList } from "@/components/stats/MatchList";
 import { StatGrid } from "@/components/stats/StatGrid";
+import { Container } from "@/components/ui/container";
+import { EmptyState } from "@/components/ui/empty-state";
+import { TextLink } from "@/components/ui/link";
+import { Section } from "@/components/ui/section";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   computeStats,
   dailyActivity,
@@ -14,6 +20,7 @@ import {
   playerMatches,
   type PlayerMatch,
 } from "@/lib/stats";
+import { formatRecord } from "@/lib/utils";
 
 type Props = { params: Promise<{ username: string }> };
 
@@ -43,72 +50,102 @@ export default async function ProfilePage({ params }: Props) {
   const boardNames = Object.fromEntries(players.map((s) => [s.leaderboard.id, s.leaderboard.name]));
   const mostActive = [...perBoard].sort((a, b) => b.history.length - a.history.length)[0];
 
+  const joined = formatMonthYear(profile.created_at);
+  const meta =
+    players.length === 0
+      ? `Joined ${joined}`
+      : `Plays on ${players.length} leaderboard${players.length === 1 ? "" : "s"} · joined ${joined}`;
+
+  const lead = (
+    <div className="space-y-3">
+      <BackLink href="/">BowlBoard</BackLink>
+      <div className="space-y-1.5">
+        <h1 className="break-words text-2xl font-semibold tracking-tight">@{profile.username}</h1>
+        <p className="text-sm text-muted-foreground">{meta}</p>
+      </div>
+    </div>
+  );
+
+  if (players.length === 0) {
+    return (
+      <Container as="main" className="space-y-10 py-8 sm:py-12">
+        {lead}
+        <EmptyState
+          title="Not on any leaderboard yet"
+          description="Ask a board owner to link this account."
+        />
+      </Container>
+    );
+  }
+
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-8 px-4 py-10">
-      <Link href="/" className="text-sm text-slate-500 hover:text-slate-300">
-        ← BowlBoard
-      </Link>
+    <Container as="main" className="space-y-10 py-8 sm:py-12">
+      <div className="space-y-8">
+        {lead}
+        <StatGrid stats={overall} />
+      </div>
 
-      <header>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">@{profile.username}</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          {players.length === 0
-            ? "Not on any leaderboard yet."
-            : `Plays on ${players.length} leaderboard${players.length === 1 ? "" : "s"} · joined ${new Date(
-                profile.created_at
-              ).toLocaleDateString(undefined, { month: "short", year: "numeric" })}`}
-        </p>
-      </header>
-
-      <StatGrid stats={overall} />
-
-      {mostActive && mostActive.history.length > 1 && (
-        <EloSparkline series={eloSeries(mostActive.history)} />
-      )}
-
-      <ActivityTerrain
-        data={activity.data}
-        endDate={activity.endDate}
-        title="Matches played"
-        unit={["match", "matches"]}
-        className="max-w-none"
-      />
-
-      {perBoard.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-medium text-slate-400">Leaderboards</h2>
-          <ul className="divide-y divide-slate-800 rounded-xl border border-slate-800">
+      <Section title="Leaderboards">
+        <Table>
+          <caption className="sr-only">Record and rating on each leaderboard</caption>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Board</TableHead>
+              <TableHead numeric>W–L</TableHead>
+              <TableHead numeric className="hidden min-[24rem]:table-cell">
+                Win %
+              </TableHead>
+              <TableHead numeric>ELO</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {perBoard.map(({ player, leaderboard, stats }) => (
-              <li key={player.id}>
-                <Link
-                  href={`/p/${player.id}`}
-                  className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-slate-900/50"
-                >
-                  <span className="min-w-0 flex-1 truncate text-slate-100">{leaderboard.name}</span>
-                  <span className="font-mono tabular-nums text-slate-300">
-                    {stats.wins}–{stats.losses}
-                  </span>
-                  <span className="w-12 text-right font-mono tabular-nums text-slate-500">
-                    {formatWinRate(stats.winRate)}
-                  </span>
-                  <span className="w-14 text-right font-mono tabular-nums text-cyan-300">
-                    {player.elo}
-                  </span>
-                </Link>
-              </li>
+              <TableRow key={player.id}>
+                <TableCell className="break-words">
+                  <TextLink variant="plain" href={`/p/${player.id}`} className="-my-3 block py-3">
+                    {leaderboard.name}
+                  </TextLink>
+                </TableCell>
+                <TableCell numeric>{formatRecord(stats.wins, stats.losses)}</TableCell>
+                <TableCell numeric className="hidden min-[24rem]:table-cell">
+                  {formatWinRate(stats.winRate)}
+                </TableCell>
+                <TableCell numeric className="text-base font-semibold">
+                  {player.elo}
+                </TableCell>
+              </TableRow>
             ))}
-          </ul>
-        </section>
+          </TableBody>
+        </Table>
+      </Section>
+
+      {mostActive && (
+        <EloSparkline
+          series={eloSeries(mostActive.history)}
+          boardName={mostActive.leaderboard.name}
+        />
       )}
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-medium text-slate-400">Recent matches</h2>
+      {activity.data.some((n) => n > 0) && (
+        <Section title="Activity">
+          <ActivityTerrain
+            data={activity.data}
+            endDate={activity.endDate}
+            title="Matches played"
+            unit={["match", "matches"]}
+            className="terrain-theme max-w-none"
+          />
+        </Section>
+      )}
+
+      <Section title="Recent matches">
         <MatchList
           matches={allHistory}
           opponents={opponentNames}
           boards={players.length > 1 ? boardNames : undefined}
+          emptyMessage="No matches yet."
         />
-      </section>
-    </main>
+      </Section>
+    </Container>
   );
 }

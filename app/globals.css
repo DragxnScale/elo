@@ -2,49 +2,370 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * BowlBoard design tokens -- "Scorecard".
+ *
+ * Warm paper and pencil-dark ink. Colour is reserved for meaning: ballpoint
+ * blue marks what is current or focusable, green and red mark wins/losses and
+ * rating gains/drops. Everything else is a neutral.
+ *
+ * Light is the default `:root`. Dark is the `.dark` class on <html>
+ * (see docs/design/DIRECTION.md for the theme strategy). Values are oklch;
+ * the --heat-* set is hex because the Kokonut Activity Terrain canvas parses
+ * hex only. Full rationale: docs/design/DIRECTION.md and docs/adr/0001.
+ */
+
 :root {
-  --background: #050810;
-  --foreground: #e2e8f0;
-  --cyan-glow: rgba(34, 211, 238, 0.4);
+  color-scheme: light;
+
+  /* Surfaces */
+  --background: oklch(0.985 0.004 85); /* paper        #fbfaf7 */
+  --card: oklch(1 0 0); /* raised: inputs, dialogs     #ffffff */
+  --muted: oklch(0.962 0.006 85); /* wells, hover rows #f4f2ee */
+
+  /* Text */
+  --foreground: oklch(0.21 0.012 70); /* ink           #1c1712 */
+  --muted-foreground: oklch(0.47 0.012 75); /* secondary #5f5a54 */
+
+  /* Lines */
+  --border: oklch(0.915 0.007 85); /* hairline         #e5e3de */
+  --border-strong: oklch(0.84 0.009 85); /* hover/dots #cdcac4 */
+  --input: oklch(0.64 0.01 80); /* control edge (3:1) #8f8c85 */
+
+  /* Action: the ink itself */
+  --primary: oklch(0.21 0.012 70);
+  --primary-foreground: oklch(0.985 0.004 85);
+
+  /* Ballpoint blue: current selection, focus, live, links on hover */
+  --accent: oklch(0.46 0.17 264); /*                   #244eb5 */
+  --accent-subtle: oklch(0.95 0.025 264); /*           #e6efff */
+  --ring: var(--accent);
+
+  /* Meaning. Win/up share green, loss/down share red. Never colour alone. */
+  --win: oklch(0.5 0.13 152); /*                       #05773b */
+  --win-subtle: oklch(0.955 0.035 152); /*             #e0f7e5 */
+  --loss: oklch(0.52 0.18 27); /*                      #ba2b28 */
+  --loss-subtle: oklch(0.955 0.03 27); /*              #ffe9e5 */
+  --warn: oklch(0.5 0.11 70); /*                       #8a5600 */
+  --warn-subtle: oklch(0.96 0.04 85); /*               #fef0d4 */
+
+  /* Overlay scrim and elevation (overlays only; everything else is flat) */
+  --scrim: oklch(0.2 0.01 70 / 0.38);
+  --elevation-overlay:
+    0 1px 2px oklch(0.2 0.01 70 / 0.06), 0 16px 40px -12px oklch(0.2 0.01 70 / 0.22);
+
+  /* Kokonut Activity Terrain (hex only; consumed via .terrain-theme) */
+  --heat-0: #edebe6;
+  --heat-1: #d4d1ca;
+  --heat-2: #a29e96;
+  --heat-3: #625d56;
+  --heat-4: #1e1a15;
+  --heat-accent: #244eb5;
+  --heat-text: #5f5a54;
+
+  --radius: 0.5rem;
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: oklch(0.175 0.006 70); /* warm charcoal #12100e */
+  --card: oklch(0.215 0.007 70); /*                     #1c1916 */
+  --muted: oklch(0.235 0.008 70); /*                    #211d1a */
+
+  --foreground: oklch(0.945 0.005 85); /*               #eeede9 */
+  --muted-foreground: oklch(0.71 0.01 78); /*           #a5a19b */
+
+  --border: oklch(0.29 0.009 70); /*                    #2e2b27 */
+  --border-strong: oklch(0.38 0.01 70); /*              #46423d */
+  --input: oklch(0.52 0.01 70); /*                      #6d6863 */
+
+  --primary: oklch(0.945 0.005 85);
+  --primary-foreground: oklch(0.175 0.006 70);
+
+  --accent: oklch(0.76 0.12 264); /*                    #8ab0fe */
+  --accent-subtle: oklch(0.27 0.05 264); /*             #1a263f */
+
+  --win: oklch(0.78 0.15 152); /*                       #62d286 */
+  --win-subtle: oklch(0.26 0.05 152); /*                #0e2b18 */
+  --loss: oklch(0.75 0.15 25); /*                       #ff847d */
+  --loss-subtle: oklch(0.27 0.06 25); /*                #3f1917 */
+  --warn: oklch(0.8 0.12 80); /*                        #e6b55d */
+  --warn-subtle: oklch(0.27 0.05 80); /*                #332305 */
+
+  --scrim: oklch(0.08 0.005 70 / 0.62);
+  --elevation-overlay:
+    0 1px 2px oklch(0 0 0 / 0.3), 0 16px 40px -12px oklch(0 0 0 / 0.6);
+
+  --heat-0: #292622;
+  --heat-1: #413c38;
+  --heat-2: #6d6861;
+  --heat-3: #aeaaa4;
+  --heat-4: #edebe7;
+  --heat-accent: #8ab0fe;
+  --heat-text: #a5a19b;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-win: var(--win);
+  --color-win-subtle: var(--win-subtle);
+  --color-loss: var(--loss);
+  --color-loss-subtle: var(--loss-subtle);
+  --color-destructive: var(--loss);
+  --color-warn: var(--warn);
+  --color-warn-subtle: var(--warn-subtle);
+  --color-scrim: var(--scrim);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  /* 4 / 6 / 8 / 12 px. Controls are md, containers lg, dialogs xl. */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-overlay: var(--elevation-overlay);
+
+  /* Stronger-than-default curves (see Motion in DIRECTION.md). */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
+  /* One authored moment: a row that just changed settles from a ballpoint tint. */
+  --animate-settle: settle 1400ms var(--ease-out) both;
+  @keyframes settle {
+    from {
+      background-color: var(--accent-subtle);
+    }
+    to {
+      background-color: transparent;
+    }
+  }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    letter-spacing: -0.015em;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Numbers line up everywhere data lives. */
+  table,
+  dl,
+  time {
+    font-variant-numeric: tabular-nums;
+  }
+
+  a {
+    text-underline-offset: 4px;
+  }
+
+  /* Browser surfaces: selection, caret, focus, scrollbars, taps. */
+  ::selection {
+    background: color-mix(in oklch, var(--accent) 24%, transparent);
+    color: inherit;
+  }
+
+  input,
+  textarea,
+  select {
+    caret-color: var(--accent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+
+  button,
+  [role="button"],
+  [role="tab"],
+  select,
+  summary,
+  a {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  button:not(:disabled),
+  [role="button"],
+  [role="tab"] {
+    cursor: pointer;
+  }
+
+  body:has(dialog[open]) {
+    overflow: hidden;
+  }
+
+  /* Reduced motion: no movement, no looping; colour changes stay. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
-.bg-grid {
-  background-image:
-    linear-gradient(rgba(34, 211, 238, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(34, 211, 238, 0.03) 1px, transparent 1px);
-  background-size: 48px 48px;
+/*
+ * Native <dialog> (components/ui/dialog.tsx). Enter 180ms, exit 120ms:
+ * slow where the user is deciding, fast where the system responds.
+ */
+@layer components {
+  dialog.ui-dialog {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+    transition:
+      opacity 120ms var(--ease-out),
+      transform 120ms var(--ease-out),
+      overlay 120ms allow-discrete,
+      display 120ms allow-discrete;
+  }
+  dialog.ui-dialog[open] {
+    opacity: 1;
+    transform: none;
+    transition-duration: 180ms;
+  }
+  @starting-style {
+    dialog.ui-dialog[open] {
+      opacity: 0;
+      transform: translateY(6px) scale(0.98);
+    }
+  }
+  dialog.ui-dialog::backdrop {
+    background: var(--scrim);
+    opacity: 0;
+    transition:
+      opacity 120ms var(--ease-out),
+      overlay 120ms allow-discrete,
+      display 120ms allow-discrete;
+  }
+  dialog.ui-dialog[open]::backdrop {
+    opacity: 1;
+    transition-duration: 180ms;
+  }
+  @starting-style {
+    dialog.ui-dialog[open]::backdrop {
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    dialog.ui-dialog,
+    dialog.ui-dialog[open] {
+      transform: none;
+    }
+  }
+
+  /*
+   * Bridge for the vendored Kokonut Activity Terrain. Add `terrain-theme` to
+   * its className. It re-points the component's --terrain-* variables (which
+   * it sets inline-by-class for zinc) at the Scorecard heat ramp, and recolours
+   * the zinc chrome (segmented toggle, legend text) without editing the vendor
+   * file. The !important is deliberate: the vendor sets the same custom
+   * properties on the same element.
+   */
+  .terrain-theme {
+    --terrain-0: var(--heat-0) !important;
+    --terrain-1: var(--heat-1) !important;
+    --terrain-2: var(--heat-2) !important;
+    --terrain-3: var(--heat-3) !important;
+    --terrain-4: var(--heat-4) !important;
+    --terrain-accent: var(--heat-accent) !important;
+    --terrain-text: var(--heat-text) !important;
+    border-color: var(--border) !important;
+    background-color: var(--card) !important;
+    color: var(--foreground) !important;
+    border-radius: var(--radius-xl) !important;
+  }
+  .terrain-theme canvas {
+    border-bottom-left-radius: var(--radius-xl);
+    border-bottom-right-radius: var(--radius-xl);
+  }
+  .terrain-theme [class*="text-zinc-500"],
+  .terrain-theme [class*="text-zinc-400"] {
+    color: var(--muted-foreground) !important;
+  }
+  .terrain-theme [class*="bg-zinc-100"],
+  .terrain-theme [class*="bg-zinc-900"] {
+    background-color: var(--muted) !important;
+  }
+  .terrain-theme button[aria-pressed="true"] {
+    background-color: var(--card) !important;
+    color: var(--foreground) !important;
+    box-shadow: 0 0 0 1px var(--border) !important;
+  }
 }
 
-.input-futuristic {
-  @apply rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30;
-}
+/* ------------------------------------------------------------------------
+ * DEPRECATED legacy classes. Kept (restyled to the Scorecard identity) so
+ * nothing breaks while teams migrate. Do not use in new code: use
+ * components/ui/{button,input,select}. Delete once grep finds no usages.
+ * ---------------------------------------------------------------------- */
 
+/* deprecated: use <Button> */
 .btn-primary {
-  @apply rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 px-4 py-2 text-sm font-medium text-slate-950 shadow-[0_0_20px_rgba(34,211,238,0.25)] transition hover:from-cyan-500 hover:to-cyan-400 disabled:opacity-50;
+  @apply rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors duration-150 ease-out hover:bg-primary/85 disabled:opacity-50;
 }
 
+/* deprecated: use <Button variant="secondary"> */
 .btn-secondary {
-  @apply rounded-lg border border-violet-500/40 bg-violet-500/10 px-4 py-2 text-sm text-violet-200 transition hover:bg-violet-500/20 disabled:opacity-50;
+  @apply rounded-md border border-input bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors duration-150 ease-out hover:bg-muted disabled:opacity-50;
+}
+
+/* deprecated: use <Input> / <Select> */
+.input-futuristic {
+  @apply rounded-md border border-input bg-card px-3 py-2 text-base text-foreground outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-muted-foreground focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/20 sm:text-sm;
 }
 
 select.input-futuristic option {
-  background: #0f172a;
-  color: #e2e8f0;
+  background: var(--card);
+  color: var(--foreground);
 }
 
+/* deprecated: use <Select size="lg"> */
 .select-match {
   @apply min-h-[3.25rem] min-w-[12rem] flex-1 cursor-pointer px-4 py-3 text-base font-medium;
 }
@@ -53,4 +374,9 @@ select.input-futuristic option {
   .select-match {
     min-width: 14rem;
   }
+}
+
+/* deprecated: the decorative grid is not part of the identity; now a no-op. */
+.bg-grid {
+  background-image: none;
 }

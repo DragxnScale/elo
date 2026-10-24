@@ -1,12 +1,16 @@
+import { cache } from "react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPlayerDetail } from "@/app/actions";
 import ActivityTerrain from "@/components/kokonutui/activity-terrain";
+import { BackLink } from "@/components/stats/BackLink";
 import { EloSparkline } from "@/components/stats/EloSparkline";
 import { HeadToHeadTable } from "@/components/stats/HeadToHeadTable";
 import { MatchList } from "@/components/stats/MatchList";
 import { StatGrid } from "@/components/stats/StatGrid";
+import { Container } from "@/components/ui/container";
+import { TextLink } from "@/components/ui/link";
+import { Section } from "@/components/ui/section";
 import {
   computeStats,
   dailyActivity,
@@ -17,16 +21,19 @@ import {
 
 type Props = { params: Promise<{ id: string }> };
 
+// One request, one set of queries: metadata and page share this call.
+const getDetail = cache(getPlayerDetail);
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const detail = await getPlayerDetail(id);
+  const detail = await getDetail(id);
   if ("error" in detail) return { title: "Player · BowlBoard" };
   return { title: `${detail.player.name} · ${detail.leaderboard.name} · BowlBoard` };
 }
 
 export default async function PlayerPage({ params }: Props) {
   const { id } = await params;
-  const detail = await getPlayerDetail(id);
+  const detail = await getDetail(id);
   if ("error" in detail) notFound();
 
   const { player, leaderboard, matches, players, rank, username } = detail;
@@ -37,48 +44,67 @@ export default async function PlayerPage({ params }: Props) {
   const activity = dailyActivity(history);
 
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-8 px-4 py-10">
-      <Link href="/" className="text-sm text-slate-500 hover:text-slate-300">
-        ← {leaderboard.name}
-      </Link>
+    <Container as="main" className="space-y-10 py-8 sm:py-12">
+      <div className="space-y-8">
+        <div className="space-y-3">
+          <BackLink href="/">{leaderboard.name}</BackLink>
 
-      <header>
-        <p className="text-sm text-slate-500">
-          #{rank} of {players.length} on {leaderboard.name}
-        </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-50">
-          {player.name}
-        </h1>
-        {username && (
-          <Link href={`/u/${username}`} className="text-sm text-slate-400 hover:underline">
-            @{username}
-          </Link>
-        )}
-      </header>
+          <div className="space-y-1.5">
+            <h1 className="break-words text-2xl font-semibold tracking-tight">{player.name}</h1>
+            {(rank > 0 || username) && (
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 break-words text-sm text-muted-foreground">
+                {rank > 0 && (
+                  <span>
+                    #{rank} of {players.length} on {leaderboard.name}
+                  </span>
+                )}
+                {username && (
+                  <>
+                    {rank > 0 && <span aria-hidden>·</span>}
+                    <TextLink
+                      variant="quiet"
+                      href={`/u/${username}`}
+                      className="min-w-0 underline decoration-border-strong"
+                    >
+                      @{username}
+                    </TextLink>
+                  </>
+                )}
+              </p>
+            )}
+          </div>
+        </div>
 
-      <StatGrid stats={stats} elo={player.elo} />
+        <StatGrid stats={stats} elo={player.elo} />
+      </div>
+
       <EloSparkline series={eloSeries(history)} />
 
-      <ActivityTerrain
-        data={activity.data}
-        endDate={activity.endDate}
-        title="Matches played"
-        unit={["match", "matches"]}
-        defaultFlat
-        className="max-w-none"
-      />
+      {activity.data.some((n) => n > 0) && (
+        <Section title="Activity">
+          <ActivityTerrain
+            data={activity.data}
+            endDate={activity.endDate}
+            title="Matches played"
+            unit={["match", "matches"]}
+            defaultFlat
+            className="terrain-theme max-w-none"
+          />
+        </Section>
+      )}
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-medium text-slate-400">Recent matches</h2>
+      <Section title="Recent matches">
         <MatchList matches={history} opponents={opponents} />
-      </section>
+      </Section>
 
       {history.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-medium text-slate-400">Head to head</h2>
+        <Section
+          title="Head to head"
+          description="Record against each opponent, most played first."
+        >
           <HeadToHeadTable rows={headToHead(history)} names={names} />
-        </section>
+        </Section>
       )}
-    </main>
+    </Container>
   );
 }
