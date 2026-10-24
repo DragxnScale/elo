@@ -2,11 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPlayerDetail } from "@/app/actions";
+import ActivityTerrain from "@/components/kokonutui/activity-terrain";
 import { EloSparkline } from "@/components/stats/EloSparkline";
 import { HeadToHeadTable } from "@/components/stats/HeadToHeadTable";
 import { MatchList } from "@/components/stats/MatchList";
 import { StatGrid } from "@/components/stats/StatGrid";
-import { computeStats, eloSeries, headToHead, playerMatches } from "@/lib/stats";
+import {
+  computeStats,
+  dailyActivity,
+  eloSeries,
+  headToHead,
+  playerMatches,
+} from "@/lib/stats";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -27,6 +34,7 @@ export default async function PlayerPage({ params }: Props) {
   const stats = computeStats(history, player.elo);
   const names = Object.fromEntries(players.map((p) => [p.id, p.name]));
   const opponents = Object.fromEntries(players.map((p) => [p.id, { name: p.name }]));
+  const activity = dailyActivity(history);
 
   return (
     <main className="mx-auto w-full max-w-3xl space-y-8 px-4 py-10">
@@ -50,6 +58,15 @@ export default async function PlayerPage({ params }: Props) {
 
       <StatGrid stats={stats} elo={player.elo} />
       <EloSparkline series={eloSeries(history)} />
+
+      <ActivityTerrain
+        data={activity.data}
+        endDate={activity.endDate}
+        title="Matches played"
+        unit={["match", "matches"]}
+        defaultFlat
+        className="max-w-none"
+      />
 
       <section className="space-y-3">
         <h2 className="text-sm font-medium text-slate-400">Recent matches</h2>

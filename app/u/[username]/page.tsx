@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProfileDetail } from "@/app/actions";
+import ActivityTerrain from "@/components/kokonutui/activity-terrain";
 import { EloSparkline } from "@/components/stats/EloSparkline";
 import { MatchList } from "@/components/stats/MatchList";
 import { StatGrid } from "@/components/stats/StatGrid";
 import {
   computeStats,
+  dailyActivity,
   eloSeries,
   formatWinRate,
   playerMatches,
@@ -33,6 +35,7 @@ export default async function ProfilePage({ params }: Props) {
   });
   const allHistory: PlayerMatch[] = perBoard.flatMap((b) => b.history);
   const overall = computeStats(allHistory);
+  const activity = dailyActivity(allHistory);
 
   const opponentNames = Object.fromEntries(
     [...opponents, ...players.map((s) => s.player)].map((p) => [p.id, { name: p.name }])
@@ -62,6 +65,14 @@ export default async function ProfilePage({ params }: Props) {
       {mostActive && mostActive.history.length > 1 && (
         <EloSparkline series={eloSeries(mostActive.history)} />
       )}
+
+      <ActivityTerrain
+        data={activity.data}
+        endDate={activity.endDate}
+        title="Matches played"
+        unit={["match", "matches"]}
+        className="max-w-none"
+      />
 
       {perBoard.length > 0 && (
         <section className="space-y-3">

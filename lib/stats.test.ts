@@ -1,4 +1,4 @@
-import { computeStats, eloSeries, headToHead, playerMatches, recordsByPlayer } from "./stats";
+import { computeStats, dailyActivity, eloSeries, headToHead, playerMatches, recordsByPlayer } from "./stats";
 import type { Match } from "./types";
 
 function test(name: string, fn: () => void) {
@@ -91,4 +91,20 @@ test("recordsByPlayer", () => {
   eq(r.get("a"), { wins: 3, losses: 1 }, "a");
   eq(r.get("b"), { wins: 1, losses: 2 }, "b");
   eq(r.get("c"), { wins: 0, losses: 1 }, "c");
+});
+
+test("dailyActivity buckets by UTC day, oldest first", () => {
+  const end = new Date(Date.UTC(2026, 0, 10, 15));
+  const { data, endDate } = dailyActivity(
+    [
+      { playedAt: "2026-01-10T01:00:00Z" },
+      { playedAt: "2026-01-10T23:00:00Z" },
+      { playedAt: "2026-01-04T12:00:00Z" },
+      { playedAt: "2025-01-01T12:00:00Z" }, // outside the window
+    ],
+    1,
+    end
+  );
+  eq(endDate, "2026-01-10", "end date");
+  eq(data, [1, 0, 0, 0, 0, 0, 2], "counts");
 });

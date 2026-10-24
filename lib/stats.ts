@@ -185,3 +185,30 @@ export function formatWinRate(rate: number | null): string {
 export function formatRatio(ratio: number | null): string {
   return ratio === null ? "—" : ratio.toFixed(2);
 }
+
+const DAY_MS = 86_400_000;
+
+/** YYYY-MM-DD in UTC. */
+export function utcDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Matches played per UTC day for the `weeks` weeks ending on `end`, oldest
+ * first — the shape ActivityTerrain takes.
+ */
+export function dailyActivity(
+  history: { playedAt: string }[],
+  weeks = 26,
+  end: Date = new Date()
+): { data: number[]; endDate: string } {
+  const days = weeks * 7;
+  const endDate = utcDay(end);
+  const endMs = Date.parse(endDate);
+  const data = new Array<number>(days).fill(0);
+  for (const m of history) {
+    const offset = Math.round((endMs - Date.parse(utcDay(new Date(m.playedAt)))) / DAY_MS);
+    if (offset >= 0 && offset < days) data[days - 1 - offset]!++;
+  }
+  return { data, endDate };
+}

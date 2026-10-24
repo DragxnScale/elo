@@ -7,6 +7,7 @@ import { ViewLeaderboards } from "@/components/ViewLeaderboards";
 import { CreateLeaderboard } from "@/components/CreateLeaderboard";
 import { EditLeaderboards } from "@/components/EditLeaderboards";
 import { ConfigBanner } from "@/components/ConfigBanner";
+import DotField from "@/components/kokonutui/dot-field";
 import { getMyLeaderboards } from "@/app/actions";
 
 type Tab = "view" | "create" | "edit";
@@ -44,13 +45,12 @@ export function AppShell() {
 
   return (
     <div className="relative min-h-screen overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 bg-grid opacity-40" />
-      <div className="pointer-events-none absolute -top-32 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-cyan-500/10 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-0 right-0 h-80 w-80 rounded-full bg-violet-600/10 blur-3xl" />
-
       <ConfigBanner />
-      <header className="relative border-b border-cyan-500/10 bg-[#050810]/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between">
+      <DotField
+        spacing={14}
+        className="min-h-0 items-stretch border-b border-slate-800/80 bg-transparent text-slate-500 dark:bg-transparent dark:text-slate-500"
+      >
+        <header className="relative mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-14 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="bg-gradient-to-r from-cyan-200 via-white to-violet-300 bg-clip-text text-3xl font-bold tracking-tight text-transparent">
               BowlBoard
@@ -60,8 +60,8 @@ export function AppShell() {
             </p>
           </div>
           <AuthPanel username={username} onAuthChange={refreshAuth} />
-        </div>
-      </header>
+        </header>
+      </DotField>
 
       <main className="relative mx-auto max-w-5xl px-4 py-8">
         <nav className="mb-8 flex flex-wrap gap-2 border-b border-slate-800 pb-4">
