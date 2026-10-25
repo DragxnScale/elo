@@ -4,7 +4,12 @@ import { getSupabaseEnv } from "@/lib/env";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
-  const { url, anonKey } = getSupabaseEnv();
+  const { url, anonKey, isConfigured } = getSupabaseEnv();
+
+  // Without a Supabase URL and key there is no session to refresh. Let the
+  // page render so ConfigBanner can say what is missing, instead of crashing
+  // every request.
+  if (!isConfigured) return supabaseResponse;
 
   const supabase = createServerClient(
     url,
