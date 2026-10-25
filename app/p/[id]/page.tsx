@@ -36,7 +36,8 @@ export default async function PlayerPage({ params }: Props) {
   const detail = await getDetail(id);
   if ("error" in detail) notFound();
 
-  const { player, leaderboard, matches, players, rank, username } = detail;
+  const { player, leaderboard, matches, players, rank, boardSize, username } = detail;
+  const offBoard = player.status === "left" || player.status === "removed";
   const history = playerMatches(matches, player.id);
   const stats = computeStats(history, player.elo);
   const names = Object.fromEntries(players.map((p) => [p.id, p.name]));
@@ -51,16 +52,17 @@ export default async function PlayerPage({ params }: Props) {
 
           <div className="space-y-1.5">
             <h1 className="break-words text-2xl font-semibold tracking-tight">{player.name}</h1>
-            {(rank > 0 || username) && (
+            {(rank > 0 || offBoard || username) && (
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 break-words text-sm text-muted-foreground">
                 {rank > 0 && (
                   <span>
-                    #{rank} of {players.length} on {leaderboard.name}
+                    #{rank} of {boardSize} on {leaderboard.name}
                   </span>
                 )}
+                {offBoard && <span>No longer on {leaderboard.name}</span>}
                 {username && (
                   <>
-                    {rank > 0 && <span aria-hidden>·</span>}
+                    {(rank > 0 || offBoard) && <span aria-hidden>·</span>}
                     <TextLink
                       variant="quiet"
                       href={`/u/${username}`}

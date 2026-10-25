@@ -12,9 +12,11 @@ type AddPlayerProps = {
   leaderboardId: string;
   /** Reload players and refresh the rankings table. */
   onAdded: () => void;
+  /** Linking a new player to an account is owner-only. */
+  canLink?: boolean;
 };
 
-export function AddPlayer({ leaderboardId, onAdded }: AddPlayerProps) {
+export function AddPlayer({ leaderboardId, onAdded, canLink = true }: AddPlayerProps) {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [nameError, setNameError] = useState<string | undefined>();
@@ -35,7 +37,7 @@ export function AddPlayer({ leaderboardId, onAdded }: AddPlayerProps) {
     setSubmitting(true);
     setServerError(undefined);
     setAdded(null);
-    const result = await addPlayer(leaderboardId, name, username);
+    const result = await addPlayer(leaderboardId, name, canLink ? username : undefined);
     setSubmitting(false);
     if (result.error) {
       setServerError(result.error);
@@ -72,6 +74,7 @@ export function AddPlayer({ leaderboardId, onAdded }: AddPlayerProps) {
             enterKeyHint="go"
           />
         </Field>
+        {canLink && (
         <Field
           label="Account username"
           optional
@@ -91,6 +94,7 @@ export function AddPlayer({ leaderboardId, onAdded }: AddPlayerProps) {
             enterKeyHint="go"
           />
         </Field>
+        )}
         <div className="space-y-3 sm:col-span-2">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <Button type="submit" variant="secondary" loading={submitting}>

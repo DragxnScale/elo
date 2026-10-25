@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { deleteLeaderboard, getMyLeaderboards } from "@/app/actions";
+import { deleteLeaderboard, getManagedBoards } from "@/app/actions";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { BoardWorkbench } from "@/components/manage/BoardWorkbench";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,9 @@ import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Leaderboard } from "@/lib/types";
+import type { BoardRole, Leaderboard } from "@/lib/types";
+
+type ManagedBoard = Leaderboard & { role: BoardRole };
 
 type EditLeaderboardsProps = {
   isAuthenticated: boolean;
@@ -41,7 +43,7 @@ function EditPanel({
   onCreateBoard,
   onBoardsChanged,
 }: Pick<EditLeaderboardsProps, "onCreateBoard" | "onBoardsChanged">) {
-  const [boards, setBoards] = useState<Leaderboard[]>([]);
+  const [boards, setBoards] = useState<ManagedBoard[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | undefined>();
   const [reloadKey, setReloadKey] = useState(0);
@@ -68,13 +70,13 @@ function EditPanel({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const result = await getMyLeaderboards();
+      const result = await getManagedBoards();
       if (cancelled) return;
-      if (result.error) {
+      if ("error" in result && result.error) {
         setLoadError(result.error);
       } else {
         setLoadError(undefined);
-        setBoards(result.leaderboards as Leaderboard[]);
+        setBoards(result.boards);
       }
       setLoaded(true);
     })();
@@ -111,11 +113,11 @@ function EditPanel({
     }
     // Keep the dialog up until the list is fresh, so the deleted board never
     // lingers on screen after the dialog has closed.
-    const refreshed = await getMyLeaderboards();
+    const refreshed = await getManagedBoards();
     setBoards(
-      refreshed.error
+      "error" in refreshed && refreshed.error
         ? (prev) => prev.filter((b) => b.id !== id)
-        : (refreshed.leaderboards as Leaderboard[])
+        : refreshed.boards
     );
     setDeletedName(name);
     setDeleting(false);
@@ -193,6 +195,7 @@ function EditPanel({
               {boards.map((board) => (
                 <option key={board.id} value={board.id}>
                   {board.name} ({board.share_code})
+                  {board.role === "admin" ? " · admin" : ""}
                 </option>
               ))}
             </Select>
@@ -200,13 +203,19 @@ function EditPanel({
           {/* sm:mb-1.5 offsets the Field's always-mounted error slot so the
               button sits on the select's bottom edge. -ml-3 / px-3 lets the
               label, not the hover tint, meet the column edge on phones. */}
-          <Button
-            variant="danger"
-            className="-ml-3 self-start px-3 sm:-mr-3 sm:ml-0 sm:mb-1.5"
-            onClick={() => openDelete(selected)}
-          >
-            Delete board
-          </Button>
+          {selected.role === "owner" ? (
+            <Button
+              variant="danger"
+              className="-ml-3 self-start px-3 sm:-mr-3 sm:ml-0 sm:mb-1.5"
+              onClick={() => openDelete(selected)}
+            >
+              Delete board
+            </Button>
+          ) : (
+            <p className="text-sm text-muted-foreground sm:mb-3.5">
+              You&rsquo;re an admin of this board.
+            </p>
+          )}
         </div>
         {deletedName && (
           <p
@@ -227,7 +236,7 @@ function EditPanel({
         )}
       </div>
 
-      <BoardWorkbench key={selected.id} board={selected} />
+      <BoardWorkbench key={selected.id} board={selected} role={selected.role} />
 
       <ConfirmDialog
         open={deleteOpen}

@@ -50,10 +50,14 @@ export default async function ProfilePage({ params }: Props) {
   const mostActive = [...perBoard].sort((a, b) => b.history.length - a.history.length)[0];
 
   const joined = formatMonthYear(profile.created_at);
+  // Boards they're still on; boards they left still count toward their stats.
+  const current = players.filter(
+    ({ player }) => !player.status || player.status === "active"
+  ).length;
   const meta =
-    players.length === 0
+    current === 0
       ? `Joined ${joined}`
-      : `Plays on ${players.length} leaderboard${players.length === 1 ? "" : "s"} · joined ${joined}`;
+      : `Plays on ${current} leaderboard${current === 1 ? "" : "s"} · joined ${joined}`;
 
   const lead = (
     <div className="space-y-3">

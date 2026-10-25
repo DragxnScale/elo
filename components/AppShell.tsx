@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getMyLeaderboards, getSessionProfile } from "@/app/actions";
+import { getManagedBoards, getSessionProfile } from "@/app/actions";
 import { ViewLeaderboards } from "@/components/ViewLeaderboards";
 import { CreateLeaderboard } from "@/components/CreateLeaderboard";
 import { EditLeaderboards } from "@/components/EditLeaderboards";
@@ -50,8 +50,9 @@ async function loadAuthState(): Promise<LoadedAuth | null> {
   }
   let hasBoards: boolean | null = null;
   try {
-    const result = await getMyLeaderboards();
-    if (!("error" in result)) hasBoards = result.leaderboards.length > 0;
+    // Boards you own or are an admin of: the ones the Edit tab works on.
+    const result = await getManagedBoards();
+    if (!("error" in result)) hasBoards = result.boards.length > 0;
   } catch {
     // Leave hasBoards unknown; the signed-in state is still right.
   }
@@ -106,6 +107,16 @@ export function AppShell() {
     };
   }, []);
 
+  // Being made (or unmade) an admin happens on someone else's screen; pick it
+  // up when the person comes back to the tab.
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") void refreshAuth();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refreshAuth]);
+
   // Derived, not stored: losing the last board while on Edit falls back to View.
   const activeTab: Tab = tab === "edit" && !hasBoards ? "view" : tab;
 
@@ -144,6 +155,7 @@ export function AppShell() {
             <ViewLeaderboards
               isAuthenticated={isAuthenticated}
               onCreateBoard={() => setTab("create")}
+              onMembershipChanged={refreshAuth}
             />
           ) : (
             <PanelSkeleton />
