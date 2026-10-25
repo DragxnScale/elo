@@ -56,7 +56,7 @@ Opponent        W–L    Played
 Profile page `/u/[username]`:
 
 ```
-< BowlBoard
+< Kleos
 @sam                          h1
 Plays on 3 leaderboards · joined Oct 2026
 -- 32px --
@@ -183,7 +183,7 @@ Pure helpers shared by the components (no React):
 ### 5.2 `/u/[username]`
 
 - `generateMetadata` unchanged. `getProfileDetail(decodeURIComponent(username))` and `notFound()` unchanged.
-- Back link as above, label `BowlBoard`.
+- Back link as above, label `Kleos`.
 - Identity: `h1` `@{profile.username}`; meta `Plays on {n} leaderboard(s) · joined {formatMonthYear(created_at)}` (singular for 1). With no boards the meta is `Joined {Mon YYYY}`.
 - **No boards** (`players.length === 0`): render only the lead group (back link, identity) and `<EmptyState title="Not on any leaderboard yet" description="Ask a board owner to link this account." />`. No stat group, no sections.
 - Otherwise: `StatGrid stats={overall}` (no `elo`), then the sections in this order:
@@ -199,7 +199,7 @@ Pure helpers shared by the components (no React):
 
 | Route | Title | Description | Action |
 |---|---|---|---|
-| `/p/[id]` | That player doesn't exist | The link may be old, or the player was removed. | `<Link href="/" className={buttonVariants({ variant: "secondary" })}>Back to BowlBoard</Link>` |
+| `/p/[id]` | That player doesn't exist | The link may be old, or the player was removed. | `<Link href="/" className={buttonVariants({ variant: "secondary" })}>Back to Kleos</Link>` |
 | `/u/[username]` | That user doesn't exist | Check the username, or open a board with its share code. | same |
 
 No async, no data. The apostrophe is a straight `'` in source (`&apos;` in JSX).
@@ -233,7 +233,7 @@ Trade-off recorded in the ADR: with `loading.tsx` Next streams the response, so 
 | Where | String |
 |---|---|
 | Player back link | `{leaderboard.name}` |
-| Profile back link | `BowlBoard` |
+| Profile back link | `Kleos` |
 | Player meta | `#3 of 8 on Wolf Lane` |
 | Username link | `@sam` |
 | Profile meta | `Plays on 3 leaderboards · joined Oct 2026`; `Plays on 1 leaderboard · joined Oct 2026`; `Joined Oct 2026` |
@@ -248,8 +248,8 @@ Trade-off recorded in the ADR: with `loading.tsx` Next streams the response, so 
 | Head to head description | `Record against each opponent, most played first.` |
 | Head to head table | Opponent, W–L, Played; unknown opponent `Unknown` |
 | Boards table | Board, W–L, Win %, ELO |
-| Not found (player) | `That player doesn't exist` / `The link may be old, or the player was removed.` / `Back to BowlBoard` |
-| Not found (user) | `That user doesn't exist` / `Check the username, or open a board with its share code.` / `Back to BowlBoard` |
+| Not found (player) | `That player doesn't exist` / `The link may be old, or the player was removed.` / `Back to Kleos` |
+| Not found (user) | `That user doesn't exist` / `Check the username, or open a board with its share code.` / `Back to Kleos` |
 | Loading (sr-only) | `Loading player`, `Loading profile` |
 
 Sentence case everywhere. En dash in every record and score, true minus in every signed number, em dash for no data.
@@ -285,7 +285,7 @@ Local candidates the director may promote: a rule-separated "row list" (the `Mat
 ## 11. Behaviour that must survive
 
 1. `getPlayerDetail` / `getProfileDetail` usage, `notFound()` on `"error" in detail`, `decodeURIComponent(username)`.
-2. `generateMetadata` titles on both routes, exactly as now (`Player · BowlBoard`, `{name} · {board} · BowlBoard`, `@{username} · BowlBoard`).
+2. `generateMetadata` titles on both routes, exactly as now (`Player · Kleos`, `{name} · {board} · Kleos`, `@{username} · Kleos`).
 3. Every stat: rating (player only), record, win rate, W/L ratio, current streak, best streak, peak, average score. Same formulas from `lib/stats`.
 4. `#rank of players.length on board`, and the `@username` link to `/u/{username}` when linked.
 5. Sparkline: `role="img"`, aria-label sentence, series from `eloSeries`.

@@ -4,7 +4,7 @@ Status: Accepted
 
 ## Context
 
-BowlBoard is a small ELO leaderboard app for groups of friends. People use it in two moments: on a phone at the table right after a game (pick two players, type two scores, preview the rating change, confirm), and later to check the rankings and each other's stats. Both are quick, usually one-handed, often in dim light.
+Kleos is a small ELO leaderboard app for groups of friends. People use it in two moments: on a phone at the table right after a game (pick two players, type two scores, preview the rating change, confirm), and later to check the rankings and each other's stats. Both are quick, usually one-handed, often in dim light.
 
 The existing UI was a neon "futuristic" look: a slate-950 background forced on with `class="dark"`, cyan and violet gradients, glows (`shadow-[0_0_40px_rgba(34,211,238,...)]`), gradient text, uppercase tracking-wide labels and mono numerals everywhere, bordered cards around every section, and styles split between a few global classes (`.input-futuristic`, `.btn-primary`, `.btn-secondary`, `.select-match`, `.bg-grid`) and raw Tailwind palette classes in every component. There were no shared primitives, no tokens, no light theme, and several accessibility gaps (labels not tied to inputs, placeholder-only hints, 40-ish px targets, low-contrast slate-500 on slate-950 for meta text).
 

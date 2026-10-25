@@ -1,4 +1,6 @@
-export const THEME_STORAGE_KEY = "bowlboard-theme";
+export const THEME_STORAGE_KEY = "kleos-theme";
+/** Key used before the rename to Kleos; read as a fallback so saved choices survive. */
+const LEGACY_THEME_STORAGE_KEY = "bowlboard-theme";
 
 /*
  * Runs before first paint (put <ThemeScript /> in <head> of the root layout):
@@ -6,7 +8,7 @@ export const THEME_STORAGE_KEY = "bowlboard-theme";
  * `.dark` class and color-scheme on <html>, and follows system changes while
  * no explicit choice is stored. Needs suppressHydrationWarning on <html>.
  */
-const script = `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)};var m=window.matchMedia("(prefers-color-scheme: dark)");function a(){var t=null;try{t=localStorage.getItem(k)}catch(e){}var d=t==="dark"||(t!=="light"&&m.matches);var r=document.documentElement;r.classList.toggle("dark",d);r.style.colorScheme=d?"dark":"light"}a();m.addEventListener("change",a)}catch(e){}})();`;
+const script = `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)};var m=window.matchMedia("(prefers-color-scheme: dark)");function a(){var t=null;try{t=localStorage.getItem(k)||localStorage.getItem(${JSON.stringify(LEGACY_THEME_STORAGE_KEY)})}catch(e){}var d=t==="dark"||(t!=="light"&&m.matches);var r=document.documentElement;r.classList.toggle("dark",d);r.style.colorScheme=d?"dark":"light"}a();m.addEventListener("change",a)}catch(e){}})();`;
 
 export function ThemeScript() {
   return <script dangerouslySetInnerHTML={{ __html: script }} />;

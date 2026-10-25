@@ -25,7 +25,7 @@ type Props = { params: Promise<{ username: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
-  return { title: `@${decodeURIComponent(username)} · BowlBoard` };
+  return { title: `@${decodeURIComponent(username)} · Kleos` };
 }
 
 export default async function ProfilePage({ params }: Props) {

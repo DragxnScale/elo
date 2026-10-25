@@ -35,7 +35,7 @@ Specify both pages as a hand-written player card: a name, one large rating, then
 
 **Profile boards.** A `Table` (Board, W–L, Win %, ELO) instead of the incumbent list of link rows. The board name is the link, with a block link area so the tap target is the whole 44px row, as in the leaderboard table. The boards table comes before the rating chart, as in the brief.
 
-**States.** Segment-level `not-found.tsx` for each route (centred `EmptyState` with a "Back to BowlBoard" button), and `loading.tsx` skeletons shaped like the page. The profile with no boards shows only the lead group and an `EmptyState`. The empty-matches sentence is muted, left-aligned and sits under its own heading.
+**States.** Segment-level `not-found.tsx` for each route (centred `EmptyState` with a "Back to Kleos" button), and `loading.tsx` skeletons shaped like the page. The profile with no boards shows only the lead group and an `EmptyState`. The empty-matches sentence is muted, left-aligned and sits under its own heading.
 
 **Small decisions beyond the brief.**
 

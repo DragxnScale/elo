@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BowlBoard",
+  title: "Kleos",
   description: "Live ELO leaderboards with share codes and match tracking",
 };
 
