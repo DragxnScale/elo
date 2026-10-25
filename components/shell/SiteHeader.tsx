@@ -11,7 +11,7 @@ type SiteHeaderProps = {
   onAuthChange: () => void;
 };
 
-/** Wordmark, tagline and account controls. The Dot Field lives in the root layout. */
+/** Wordmark and account controls. The Dot Field lives in the root layout. */
 export function SiteHeader({
   username,
   authReady,
@@ -27,9 +27,6 @@ export function SiteHeader({
           <h1 className="text-xl font-semibold tracking-tight text-foreground">
             BowlBoard
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground text-balance">
-            Live ratings. Upsets rewarded. Fair losses cushioned.
-          </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <AuthPanel

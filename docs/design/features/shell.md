@@ -33,8 +33,6 @@ Column: `Container` (max 768px, 16px gutters under `sm`, 24px from `sm`).
 [ config strip, only if misconfigured ]
 .................dot field.................
  BowlBoard
- Live ratings. Upsets rewarded.
- Fair losses cushioned.
  [Sign in] [Create account]            (sun)
 .............................................   <- border-b border-border
  View    Create    Edit                          <- Tabs underline, 44px tall
@@ -135,7 +133,7 @@ Full-width strip above the header, not dismissible. Wrapper `border-b border-bor
 | Where | Text |
 |---|---|
 | Wordmark | BowlBoard |
-| Tagline | Live ratings. Upsets rewarded. Fair losses cushioned. (existing copy, kept) |
+| Tagline | None (removed at the owner's request; the wordmark stands alone) |
 | Tablist `aria-label` | Leaderboards |
 | Tabs | View, Create, Edit |
 | Signed out | Sign in, Create account |
