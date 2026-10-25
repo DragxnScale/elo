@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { KleosMark } from "@/components/shell/KleosMark";
 import { Container } from "@/components/ui/container";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
@@ -12,9 +13,10 @@ export function PageBar() {
       <Container as="nav" aria-label="Site" className="flex min-h-14 items-center justify-between">
         <Link
           href="/"
-          className="-ml-2 rounded-md px-2 py-2 text-base font-semibold tracking-tight text-foreground"
+          className="-ml-2 flex items-center gap-2 rounded-md px-2 py-2 text-base font-semibold tracking-tight text-foreground"
         >
-          BowlBoard
+          <KleosMark className="size-6 shrink-0" />
+          Kleos
         </Link>
         <ThemeToggle className="-mr-2" />
       </Container>

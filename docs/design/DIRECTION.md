@@ -1,10 +1,10 @@
-# BowlBoard visual direction: "Scorecard"
+# Kleos visual direction: "Scorecard"
 
 Owner: Design Director. Everything here is binding for the design teams (shell, view, manage, stats). The review will judge every feature against sections 1 and 2.
 
 ## 1. Purpose and ethos
 
-BowlBoard is a small, friendly scoreboard for a group of friends. Someone creates a board, shares a 6-character code, adds the people who play, and after every game someone records the score. The app turns that into a live ranking (ELO), and over time into a record of who beats whom.
+Kleos is a small, friendly scoreboard for a group of friends. Someone creates a board, shares a 6-character code, adds the people who play, and after every game someone records the score. The app turns that into a live ranking (ELO), and over time into a record of who beats whom.
 
 **Who and when.** A handful of friends, in two moments:
 

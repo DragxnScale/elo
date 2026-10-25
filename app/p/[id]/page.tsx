@@ -27,8 +27,8 @@ const getDetail = cache(getPlayerDetail);
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const detail = await getDetail(id);
-  if ("error" in detail) return { title: "Player · BowlBoard" };
-  return { title: `${detail.player.name} · ${detail.leaderboard.name} · BowlBoard` };
+  if ("error" in detail) return { title: "Player · Kleos" };
+  return { title: `${detail.player.name} · ${detail.leaderboard.name} · Kleos` };
 }
 
 export default async function PlayerPage({ params }: Props) {

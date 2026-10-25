@@ -2,7 +2,7 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 
-export const metadata = { title: "Page not found · BowlBoard" };
+export const metadata = { title: "Page not found · Kleos" };
 
 const TITLE = "We couldn't find that page";
 const DESCRIPTION =
@@ -27,7 +27,7 @@ export default function NotFound() {
           href="/"
           className={buttonVariants({ variant: "primary", className: "mt-4" })}
         >
-          Back to BowlBoard
+          Back to Kleos
         </Link>
       </div>
     </Container>

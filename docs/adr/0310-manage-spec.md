@@ -4,7 +4,7 @@ Status: Accepted
 
 ## Context
 
-The Create and Edit tabs are where a board is made and where results are recorded. Recording a match is the highest-stakes interaction in BowlBoard: someone at the table, phone in one hand, often in dim light, types two scores that permanently move two people's ratings. The current implementation (`components/CreateLeaderboard.tsx`, `components/EditLeaderboards.tsx`, `components/ConfirmDialog.tsx`) uses the replaced neon look: cyan and violet bordered cards on every section, boxed red `FieldError` panels, an emerald preview panel with glowing mono figures, uppercase tracking labels, the `select-match` and `py-3 text-base` input hacks, and a fixed modal with backdrop blur and a cyan glow.
+The Create and Edit tabs are where a board is made and where results are recorded. Recording a match is the highest-stakes interaction in Kleos: someone at the table, phone in one hand, often in dim light, types two scores that permanently move two people's ratings. The current implementation (`components/CreateLeaderboard.tsx`, `components/EditLeaderboards.tsx`, `components/ConfirmDialog.tsx`) uses the replaced neon look: cyan and violet bordered cards on every section, boxed red `FieldError` panels, an emerald preview panel with glowing mono figures, uppercase tracking labels, the `select-match` and `py-3 text-base` input hacks, and a fixed modal with backdrop blur and a cyan glow.
 
 It also carries behaviour and quality problems a redesign should not copy:
 

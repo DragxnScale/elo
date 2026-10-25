@@ -3,7 +3,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * BowlBoard design tokens -- "Scorecard".
+ * Kleos design tokens -- "Scorecard".
  *
  * Warm paper and pencil-dark ink. Colour is reserved for meaning: ballpoint
  * blue marks what is current or focusable, green and red mark wins/losses and

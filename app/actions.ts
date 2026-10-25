@@ -296,6 +296,27 @@ export async function applyMatchToLeaderboard(
   return { change, player1, player2, match: match as Match };
 }
 
+/** Undo the newest match on one of your boards: both ratings go back, the match is deleted. */
+export async function undoLastMatch(leaderboardId: string) {
+  const { supabase } = await requireUser();
+
+  const { data: match, error } = await supabase.rpc("undo_last_match", {
+    p_leaderboard_id: leaderboardId,
+  });
+
+  if (error) {
+    if (error.code === "PGRST202") {
+      return { error: "Database is missing undo_last_match(). Run supabase/migrations/003_undo_last_match.sql." };
+    }
+    // 40001 (ratings moved), P0002 (nothing to undo) and 42501 (not the
+    // owner) carry messages written for people.
+    return { error: error.message };
+  }
+
+  revalidatePath("/");
+  return { match: match as Match };
+}
+
 type SupabaseServer = Awaited<ReturnType<typeof createClient>>;
 
 async function findProfileId(

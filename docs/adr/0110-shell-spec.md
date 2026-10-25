@@ -50,7 +50,7 @@ Spec: `docs/design/features/shell.md` (layout per breakpoint, states, copy, prim
 
 **Config banner.** A full-width strip: wrapper `border-b border-border bg-warn-subtle`, a `Container` inside it, and `Notice tone="warning"` made transparent and square so the strip carries the tint and the text sits on the column's left edge. Env var names stay in `font-mono` spans as the brief says; it is a second, deliberate use of mono (identifiers people copy), in line with the Direction rationale for the share code. The text now names `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the actual variable `lib/env.ts` reads) instead of "your publishable key".
 
-**404.** `app/not-found.tsx` with a centred `EmptyState` and a "Back to BowlBoard" link built with `buttonVariants()` on `next/link`. Title via metadata "Page not found · BowlBoard". No header or Dot Field.
+**404.** `app/not-found.tsx` with a centred `EmptyState` and a "Back to Kleos" link built with `buttonVariants()` on `next/link`. Title via metadata "Page not found · Kleos". No header or Dot Field.
 
 **Motion.** None added. Everything animated comes from primitives (tab underline 200ms, dialog 180/120ms, press scale) and the vendor Dot Field.
 

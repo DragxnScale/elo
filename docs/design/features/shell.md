@@ -17,7 +17,7 @@ Mode: Operate. Familiarity (tabs, a normal sign-in dialog) beats expression. The
 ## 2. Information hierarchy (top to bottom, one left edge)
 
 1. Config strip (only when misconfigured), full width.
-2. Header over the Dot Field: **wordmark** "BowlBoard" (foreground, semibold, plain text) with the muted tagline; then the **account row** (identity or Sign in / Create account) with the theme toggle at its far end.
+2. Header over the Dot Field: **wordmark** "Kleos" (foreground, semibold, plain text) with the muted tagline; then the **account row** (identity or Sign in / Create account) with the theme toggle at its far end.
 3. **Tabs** (underline): View / Create / Edit (Edit only when the user has boards).
 4. **Content** of the active tab, rendered by the feature screens inside the same column.
 
@@ -32,9 +32,7 @@ Column: `Container` (max 768px, 16px gutters under `sm`, 24px from `sm`).
 ```
 [ config strip, only if misconfigured ]
 .................dot field.................
- BowlBoard
- Live ratings. Upsets rewarded.
- Fair losses cushioned.
+ Kleos
  [Sign in] [Create account]            (sun)
 .............................................   <- border-b border-border
  View    Create    Edit                          <- Tabs underline, 44px tall
@@ -134,8 +132,8 @@ Full-width strip above the header, not dismissible. Wrapper `border-b border-bor
 
 | Where | Text |
 |---|---|
-| Wordmark | BowlBoard |
-| Tagline | Live ratings. Upsets rewarded. Fair losses cushioned. (existing copy, kept) |
+| Wordmark | Kleos |
+| Tagline | None (removed at the owner's request; the wordmark stands alone) |
 | Tablist `aria-label` | Leaderboards |
 | Tabs | View, Create, Edit |
 | Signed out | Sign in, Create account |
@@ -157,7 +155,7 @@ Full-width strip above the header, not dismissible. Wrapper `border-b border-bor
 | Any other Supabase message | Shown verbatim. |
 | Config error inside the dialog | {configError} See the notice at the top of the page. |
 | Config banner | {configError} Set `NEXT_PUBLIC_SUPABASE_URL` to your Supabase project URL (`https://xxx.supabase.co`) and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to your publishable key in your Vercel environment variables, then redeploy. Env var names and the example URL in `font-mono` spans. |
-| 404 title / description / action | We couldn't find that page / The link may be mistyped, or the board or player was removed. / Back to BowlBoard |
+| 404 title / description / action | We couldn't find that page / The link may be mistyped, or the board or player was removed. / Back to Kleos |
 
 Error mapping lives in `components/shell/auth-errors.ts` (pure function `friendlyAuthError(message, mode)`), matching on lower-cased substrings so wording changes in Supabase degrade to the verbatim message instead of breaking.
 

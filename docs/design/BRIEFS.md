@@ -14,7 +14,7 @@ Shared contracts so teams do not collide:
 
 **Feel.** A quiet frame around the content: the name, three words of navigation, and who you are. It should disappear the moment you are looking at a table. Calm, aligned to one left edge, nothing shouting.
 
-**Hierarchy.** (1) Wordmark "BowlBoard" in `foreground`, semibold, tracking tight, plain text (no gradient), with the tagline in `text-sm text-muted-foreground`; (2) account controls on the right (on a phone they drop below, left-aligned, or collapse to one row); (3) tabs View / Create / Edit as `<Tabs variant="underline">` directly under the header, sharing the content column; (4) content.
+**Hierarchy.** (1) Wordmark "Kleos" in `foreground`, semibold, tracking tight, plain text (no gradient), with the tagline in `text-sm text-muted-foreground`; (2) account controls on the right (on a phone they drop below, left-aligned, or collapse to one row); (3) tabs View / Create / Edit as `<Tabs variant="underline">` directly under the header, sharing the content column; (4) content.
 
 **Key moments.**
 - First paint in the right theme, no flash: `<ThemeScript />` in `<head>`, no forced `dark`, `suppressHydrationWarning` on `<html>`, `<ThemeToggle />` in the header.
@@ -22,7 +22,7 @@ Shared contracts so teams do not collide:
 - Sign in / create account in a `<Dialog>` with `<Field>` + `<Input>`; errors as `<Notice tone="error">` naming the problem ("Username must be 3–20 letters, numbers or underscores"); the primary button reads "Sign in" / "Create account", shows "Please wait…" while loading; Esc and backdrop close it; autofocus on username. Username-only hint ("Use a username, not an email. Example: jayden_w") stays as a hint under the field.
 - Signed in: `@username` links to /u/username (label "My stats"), then a `secondary`/`ghost` "Sign out". Signed out: "Sign in" (`secondary`) and "Create account" (`primary`).
 - Config banner: a full-width `<Notice tone="warning">` strip above the header (not an amber slab); keep the env var names in `font-mono` code spans.
-- 404 (`app/not-found.tsx`): centred `EmptyState`, "We couldn't find that page" with a "Back to BowlBoard" button.
+- 404 (`app/not-found.tsx`): centred `EmptyState`, "We couldn't find that page" with a "Back to Kleos" button.
 
 **Remove.** The gradient wordmark, the cyan/violet tab pills, `bg-grid` (now a no-op), `overflow-hidden` page wrapper hacks, cyan/violet borders, forced dark class, glow shadows, `backdrop-blur` on the modal.
 
@@ -78,7 +78,7 @@ Shared contracts so teams do not collide:
 
 **Hierarchy (player /p/[id]).** (1) Back link (`TextLink quiet`, "← Board name"); (2) identity: name as the page title (`text-2xl`), with `#3 of 8 on Board name` and `@username` (link to profile) in muted text beneath; (3) **the rating as the one headline figure** (`Stat size="lg"`) next to Record and Win rate in a `StatGroup`; (4) rating history; (5) Activity Terrain; (6) Recent matches; (7) Head to head.
 
-**Hierarchy (profile /u/[username]).** (1) `← BowlBoard`; (2) `@username` page title, meta line ("Plays on 3 leaderboards · joined Oct 2026"); (3) aggregate `StatGroup` (no single rating, since ratings are per board); (4) boards list (name, W–L, win %, rating; each row a link); (5) rating chart for the most active board; (6) Activity Terrain; (7) Recent matches across boards.
+**Hierarchy (profile /u/[username]).** (1) `← Kleos`; (2) `@username` page title, meta line ("Plays on 3 leaderboards · joined Oct 2026"); (3) aggregate `StatGroup` (no single rating, since ratings are per board); (4) boards list (name, W–L, win %, rating; each row a link); (5) rating chart for the most active board; (6) Activity Terrain; (7) Recent matches across boards.
 
 **Key moments.**
 - **StatGrid**: no boxed cells. A `StatGroup` with a hairline above, label over value, 2 columns on phones and 4 from `sm`. Win/loss streaks colour by result; everything else ink. Streak, best streak, peak, avg score keep their labels. Em dash for no data.

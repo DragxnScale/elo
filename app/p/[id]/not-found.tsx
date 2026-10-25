@@ -1,6 +1,6 @@
 import { NotFoundState } from "@/components/stats/NotFoundState";
 
-export const metadata = { title: "Player not found · BowlBoard" };
+export const metadata = { title: "Player not found · Kleos" };
 
 export default function NotFound() {
   return (

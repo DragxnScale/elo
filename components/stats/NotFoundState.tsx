@@ -20,7 +20,7 @@ export function NotFoundState({
         <h1 className="text-balance text-2xl font-semibold tracking-tight">{title}</h1>
         <p className="text-pretty text-sm text-muted-foreground">{description}</p>
         <Link href="/" className={buttonVariants({ variant: "secondary", className: "mt-4" })}>
-          Back to BowlBoard
+          Back to Kleos
         </Link>
       </div>
     </Container>

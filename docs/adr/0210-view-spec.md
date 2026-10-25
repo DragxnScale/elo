@@ -4,7 +4,7 @@ Status: Accepted
 
 ## Context
 
-The "view" tab is the payoff screen of BowlBoard: someone opens it to see who is winning, or to open a friend's board by its share code. It is used one-handed on a phone, usually in short glances. The existing implementation (`components/ViewLeaderboards.tsx`, `components/LeaderboardTable.tsx`) uses the replaced neon look: cyan bordered boxes, a tinted share-code banner inside the table, uppercase tracking labels, mono numerals, a pulsing "Syncing rankings…" text, an amber alert for the normal signed-out state, and a share code printed on every board chip.
+The "view" tab is the payoff screen of Kleos: someone opens it to see who is winning, or to open a friend's board by its share code. It is used one-handed on a phone, usually in short glances. The existing implementation (`components/ViewLeaderboards.tsx`, `components/LeaderboardTable.tsx`) uses the replaced neon look: cyan bordered boxes, a tinted share-code banner inside the table, uppercase tracking labels, mono numerals, a pulsing "Syncing rankings…" text, an amber alert for the normal signed-out state, and a share code printed on every board chip.
 
 The code also has behaviour problems that a redesign should not carry over:
 

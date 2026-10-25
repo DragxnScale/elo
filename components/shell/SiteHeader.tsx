@@ -1,6 +1,7 @@
 "use client";
 
 import { AuthPanel } from "@/components/AuthPanel";
+import { KleosMark } from "@/components/shell/KleosMark";
 import { Container } from "@/components/ui/container";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
@@ -11,7 +12,7 @@ type SiteHeaderProps = {
   onAuthChange: () => void;
 };
 
-/** Wordmark, tagline and account controls. The Dot Field lives in the root layout. */
+/** Wordmark and account controls. The Dot Field lives in the root layout. */
 export function SiteHeader({
   username,
   authReady,
@@ -24,12 +25,10 @@ export function SiteHeader({
         className="relative flex flex-col gap-4 py-6 sm:gap-5 sm:py-10 md:flex-row md:items-center md:justify-between"
       >
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            BowlBoard
+          <h1 className="flex items-center gap-2.5 text-xl font-semibold tracking-tight text-foreground">
+            <KleosMark className="size-7 shrink-0" />
+            Kleos
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground text-balance">
-            Live ratings. Upsets rewarded. Fair losses cushioned.
-          </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <AuthPanel
