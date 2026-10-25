@@ -1,7 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { Eye, EyeOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Notice } from "@/components/ui/notice";
+
+export type AuthFieldErrors = {
+  username?: string;
+  password?: string;
+};
 
 type AuthModalProps = {
   open: boolean;
@@ -9,12 +20,18 @@ type AuthModalProps = {
   username: string;
   password: string;
   loading: boolean;
-  error: string | null;
+  formError: string | null;
+  fieldErrors: AuthFieldErrors;
   onUsernameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   onClose: () => void;
+  onSwitchMode: () => void;
 };
+
+const subscribeNothing = () => () => {};
+const clientSnapshot = () => true;
+const serverSnapshot = () => false;
 
 export function AuthModal({
   open,
@@ -22,129 +39,207 @@ export function AuthModal({
   username,
   password,
   loading,
-  error,
+  formError,
+  fieldErrors,
   onUsernameChange,
   onPasswordChange,
   onSubmit,
   onClose,
+  onSwitchMode,
 }: AuthModalProps) {
-  const [mounted, setMounted] = useState(false);
+  // True on the client after hydration, false on the server: lets us portal
+  // to document.body without setting state in an effect.
+  const mounted = useSyncExternalStore(
+    subscribeNothing,
+    clientSnapshot,
+    serverSnapshot,
+  );
+  const usernameRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const pressedInside = useRef(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [wasOpen, setWasOpen] = useState(open);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // A revealed password never carries over to the next time the dialog opens.
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (!open) setShowPassword(false);
+  }
 
+  // Dialog closes on any click that lands on the backdrop, including the
+  // click that ends a text-selection drag begun inside a field. Remember where
+  // each press started and ignore that one close. Any key press clears the
+  // flag, so Esc always closes.
   useEffect(() => {
     if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const onPointerDown = (e: PointerEvent) => {
+      const dialog = bodyRef.current?.closest("dialog");
+      const target = e.target as Node | null;
+      pressedInside.current = Boolean(
+        dialog && target && target !== dialog && dialog.contains(target),
+      );
+    };
+    const onKeyDown = () => {
+      pressedInside.current = false;
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown, true);
     return () => {
-      document.body.style.overflow = prev;
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown, true);
     };
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  function handleBackdropOrEsc() {
+    if (pressedInside.current) {
+      pressedInside.current = false;
+      return;
+    }
+    onClose();
+  }
 
-  if (!open || !mounted) return null;
+  // Dialog renders its children while closed, so autoFocus would hit a hidden
+  // element. Focus Username once the dialog is open (Dialog's own effect runs
+  // first and calls showModal).
+  useEffect(() => {
+    if (open) usernameRef.current?.focus();
+  }, [open]);
+
+  // A new fieldErrors object arrives on every failed submit, so focus returns
+  // to the offending field even when the message text is unchanged.
+  useEffect(() => {
+    if (fieldErrors.username) usernameRef.current?.focus();
+    else if (fieldErrors.password) passwordRef.current?.focus();
+  }, [fieldErrors]);
+
+  if (!mounted) return null;
+
+  const signingIn = mode === "signin";
+  const title = signingIn ? "Sign in" : "Create account";
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-[200] flex min-h-[100dvh] items-center justify-center p-4 sm:p-8"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="auth-modal-title"
-    >
-      <div
-        className="absolute inset-0 bg-[#020408]/75 backdrop-blur-xl"
-        onClick={onClose}
-        aria-hidden
-      />
-
-      <form
-        onSubmit={onSubmit}
-        className="relative z-10 flex w-full max-w-lg flex-col rounded-2xl border border-cyan-500/40 bg-[#0a0f1a]/95 p-8 shadow-[0_0_80px_rgba(34,211,238,0.2)] sm:p-10"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2
-          id="auth-modal-title"
-          className="text-2xl font-semibold text-cyan-100"
-        >
-          {mode === "signin" ? "Sign in" : "Create account"}
-        </h2>
-        <p className="mt-2 text-sm text-slate-400">
-          Use a username only (not your email). Example:{" "}
-          <span className="font-mono text-cyan-300/90">jayden_w</span>
-        </p>
-
-        <div className="mt-8 space-y-5">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-400">
-              Username
-            </label>
-            <input
-              value={username}
-              onChange={(e) => onUsernameChange(e.target.value)}
-              className="input-futuristic w-full py-3 text-base"
-              placeholder="player_1"
-              autoComplete="username"
-              required
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-400">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => onPasswordChange(e.target.value)}
-              className="input-futuristic w-full py-3 text-base"
-              placeholder="••••••"
-              autoComplete={
-                mode === "signin" ? "current-password" : "new-password"
-              }
-              required
-              minLength={6}
-            />
-          </div>
-        </div>
-
-        {error && (
-          <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-            {error}
-          </p>
-        )}
-
-        <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:gap-4">
-          <button
-            type="button"
+    <Dialog
+      open={open}
+      onClose={handleBackdropOrEsc}
+      size="sm"
+      onSubmit={onSubmit}
+      title={title}
+      description={
+        signingIn ? (
+          <>
+            No account yet?{" "}
+            <Button
+              variant="link"
+              className="-my-1 py-1"
+              onClick={onSwitchMode}
+              disabled={loading}
+            >
+              Create one
+            </Button>
+          </>
+        ) : (
+          <>
+            Already have an account?{" "}
+            <Button
+              variant="link"
+              className="-my-1 py-1"
+              onClick={onSwitchMode}
+              disabled={loading}
+            >
+              Sign in
+            </Button>
+          </>
+        )
+      }
+      footer={
+        <>
+          <Button
+            variant="secondary"
             onClick={onClose}
-            className="flex-1 rounded-xl border border-slate-600 py-3 text-sm font-medium text-slate-300 transition hover:border-slate-400 hover:bg-slate-800/50"
+            className="w-full sm:w-auto"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
-            disabled={loading}
-            className="btn-primary flex-1 py-3 text-base"
+            variant="primary"
+            loading={loading}
+            className="w-full sm:w-auto"
           >
-            {loading
-              ? "Please wait…"
-              : mode === "signin"
-                ? "Sign in"
-                : "Create account"}
-          </button>
-        </div>
-      </form>
-    </div>,
-    document.body
+            {loading ? "Please wait…" : title}
+          </Button>
+        </>
+      }
+    >
+      <div ref={bodyRef} className="space-y-4">
+        <Field
+          label="Username"
+          hint="Use a username, not an email. Example: jayden_w"
+          error={fieldErrors.username}
+        >
+          <Input
+            ref={usernameRef}
+            value={username}
+            onChange={(e) => onUsernameChange(e.target.value)}
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="next"
+            aria-required="true"
+            onKeyDown={(e) => {
+              // "Next" should move to Password, not submit a half-empty form.
+              if (
+                e.key === "Enter" &&
+                !password &&
+                !e.nativeEvent.isComposing
+              ) {
+                e.preventDefault();
+                passwordRef.current?.focus();
+              }
+            }}
+          />
+        </Field>
+        <Field
+          label="Password"
+          hint={signingIn ? undefined : "At least 6 characters."}
+          error={fieldErrors.password}
+        >
+          {(control) => (
+            <div className="relative">
+              <Input
+                {...control}
+                ref={passwordRef}
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => onPasswordChange(e.target.value)}
+                autoComplete={signingIn ? "current-password" : "new-password"}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="go"
+                aria-required="true"
+                className="pr-11"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0"
+                aria-label="Show password"
+                aria-pressed={showPassword}
+                // Keep focus (and the phone keyboard) in the field.
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setShowPassword((v) => !v)}
+              >
+                {showPassword ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+              </Button>
+            </div>
+          )}
+        </Field>
+        {formError && <Notice tone="error">{formError}</Notice>}
+      </div>
+    </Dialog>,
+    document.body,
   );
 }

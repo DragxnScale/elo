@@ -1,6 +1,10 @@
 "use client";
 
 import { getSupabaseConfigError } from "@/lib/env";
+import { Container } from "@/components/ui/container";
+import { Notice } from "@/components/ui/notice";
+
+const code = "font-mono text-[0.8125rem] break-all";
 
 export function ConfigBanner() {
   const message = getSupabaseConfigError();
@@ -8,11 +12,20 @@ export function ConfigBanner() {
   if (!message) return null;
 
   return (
-    <div className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
-      {message} Set{" "}
-      <code className="font-mono text-amber-200">NEXT_PUBLIC_SUPABASE_URL</code>{" "}
-      to <code className="font-mono text-amber-200">https://xxx.supabase.co</code>{" "}
-      and your publishable key in Vercel env vars, then redeploy.
+    <div className="border-b border-border bg-warn-subtle">
+      <Container>
+        <Notice
+          tone="warning"
+          title={message}
+          className="break-words rounded-none bg-transparent px-0 py-3"
+        >
+          Set <code className={code}>NEXT_PUBLIC_SUPABASE_URL</code> to your
+          Supabase project URL (
+          <code className={code}>https://xxx.supabase.co</code>) and{" "}
+          <code className={code}>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to your
+          publishable key in your Vercel environment variables, then redeploy.
+        </Notice>
+      </Container>
     </div>
   );
 }

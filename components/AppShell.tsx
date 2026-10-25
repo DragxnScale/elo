@@ -1,99 +1,184 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getSessionProfile } from "@/app/actions";
-import { AuthPanel } from "@/components/AuthPanel";
+import { getMyLeaderboards, getSessionProfile } from "@/app/actions";
 import { ViewLeaderboards } from "@/components/ViewLeaderboards";
 import { CreateLeaderboard } from "@/components/CreateLeaderboard";
 import { EditLeaderboards } from "@/components/EditLeaderboards";
 import { ConfigBanner } from "@/components/ConfigBanner";
-import { getMyLeaderboards } from "@/app/actions";
+import { SiteHeader } from "@/components/shell/SiteHeader";
+import { Container } from "@/components/ui/container";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 
 type Tab = "view" | "create" | "edit";
 
+type AuthState = {
+  /** False until the first session check has finished (successfully or not). */
+  ready: boolean;
+  isAuthenticated: boolean;
+  username: string | null;
+  hasBoards: boolean;
+};
+
+const INITIAL_AUTH: AuthState = {
+  ready: false,
+  isAuthenticated: false,
+  username: null,
+  hasBoards: false,
+};
+
+type LoadedAuth = Omit<AuthState, "hasBoards"> & {
+  /** null when the boards lookup failed: keep whatever was known before. */
+  hasBoards: boolean | null;
+};
+
+/**
+ * One round trip (plus the boards lookup when signed in). Never throws.
+ * Returns null when the session check itself failed, so the caller can decide
+ * what "unknown" means (see resolveAuth).
+ */
+async function loadAuthState(): Promise<LoadedAuth | null> {
+  let session: Awaited<ReturnType<typeof getSessionProfile>>;
+  try {
+    session = await getSessionProfile();
+  } catch {
+    return null;
+  }
+  if (!session.user) {
+    return { ...INITIAL_AUTH, ready: true };
+  }
+  let hasBoards: boolean | null = null;
+  try {
+    const result = await getMyLeaderboards();
+    if (!("error" in result)) hasBoards = result.leaderboards.length > 0;
+  } catch {
+    // Leave hasBoards unknown; the signed-in state is still right.
+  }
+  return {
+    ready: true,
+    isAuthenticated: true,
+    username: session.profile?.username ?? null,
+    hasBoards,
+  };
+}
+
+/**
+ * Folds a load result into the current state. A failed first check counts as
+ * signed out so the shell is never stuck on skeletons; a failed refresh keeps
+ * what the person already saw rather than flipping them to signed out.
+ */
+function resolveAuth(prev: AuthState, next: LoadedAuth | null): AuthState {
+  if (!next) return prev.ready ? prev : { ...INITIAL_AUTH, ready: true };
+  return { ...next, hasBoards: next.hasBoards ?? prev.hasBoards };
+}
+
+function PanelSkeleton() {
+  return (
+    <div role="status" className="space-y-2">
+      <span className="sr-only">Loading…</span>
+      <Skeleton className="h-11" />
+      <Skeleton className="h-11" />
+      <Skeleton className="h-11" />
+    </div>
+  );
+}
+
+const panelClass = "pt-8 sm:pt-10";
+
 export function AppShell() {
   const [tab, setTab] = useState<Tab>("view");
-  const [username, setUsername] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [hasBoards, setHasBoards] = useState(false);
+  const [auth, setAuth] = useState<AuthState>(INITIAL_AUTH);
+  const { ready: authReady, isAuthenticated, username, hasBoards } = auth;
 
   const refreshAuth = useCallback(async () => {
-    const { user, profile } = await getSessionProfile();
-    setIsAuthenticated(!!user);
-    setUsername(profile?.username ?? null);
-
-    if (user) {
-      const { leaderboards } = await getMyLeaderboards();
-      setHasBoards((leaderboards?.length ?? 0) > 0);
-    } else {
-      setHasBoards(false);
-    }
+    const next = await loadAuthState();
+    setAuth((prev) => resolveAuth(prev, next));
   }, []);
 
   useEffect(() => {
-    refreshAuth();
-  }, [refreshAuth]);
+    let cancelled = false;
+    loadAuthState().then((next) => {
+      if (!cancelled) setAuth((prev) => resolveAuth(prev, next));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "view", label: "View Leaderboards" },
-    { id: "create", label: "Create Leaderboards" },
+  // Derived, not stored: losing the last board while on Edit falls back to View.
+  const activeTab: Tab = tab === "edit" && !hasBoards ? "view" : tab;
+
+  const items: { value: Tab; label: string }[] = [
+    { value: "view", label: "View" },
+    { value: "create", label: "Create" },
   ];
-  if (hasBoards) {
-    tabs.push({ id: "edit", label: "Edit Leaderboards" });
-  }
+  if (hasBoards) items.push({ value: "edit", label: "Edit" });
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 bg-grid opacity-40" />
-      <div className="pointer-events-none absolute -top-32 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-cyan-500/10 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-0 right-0 h-80 w-80 rounded-full bg-violet-600/10 blur-3xl" />
-
+    <>
       <ConfigBanner />
-      <header className="relative border-b border-cyan-500/10 bg-[#050810]/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="bg-gradient-to-r from-cyan-200 via-white to-violet-300 bg-clip-text text-3xl font-bold tracking-tight text-transparent">
-              BowlBoard
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Live ratings. Upsets rewarded. Fair losses cushioned.
-            </p>
-          </div>
-          <AuthPanel username={username} onAuthChange={refreshAuth} />
-        </div>
-      </header>
+      <SiteHeader
+        username={username}
+        authReady={authReady}
+        onAuthChange={refreshAuth}
+      />
 
-      <main className="relative mx-auto max-w-5xl px-4 py-8">
-        <nav className="mb-8 flex flex-wrap gap-2 border-b border-slate-800 pb-4">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                tab === t.id
-                  ? "bg-gradient-to-r from-cyan-500/20 to-violet-500/20 text-cyan-200 ring-1 ring-cyan-500/40"
-                  : "text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </nav>
+      <Container as="main" className="pb-16">
+        <Tabs
+          variant="underline"
+          idPrefix="shell"
+          aria-label="Leaderboards"
+          items={items}
+          value={activeTab}
+          onValueChange={setTab}
+        />
 
-        {tab === "view" && (
-          <ViewLeaderboards isAuthenticated={isAuthenticated} />
+        <TabPanel
+          idPrefix="shell"
+          value="view"
+          active={activeTab === "view"}
+          className={panelClass}
+        >
+          {authReady ? (
+            <ViewLeaderboards
+              isAuthenticated={isAuthenticated}
+              onCreateBoard={() => setTab("create")}
+            />
+          ) : (
+            <PanelSkeleton />
+          )}
+        </TabPanel>
+        <TabPanel
+          idPrefix="shell"
+          value="create"
+          active={activeTab === "create"}
+          className={panelClass}
+        >
+          {authReady ? (
+            <CreateLeaderboard
+              isAuthenticated={isAuthenticated}
+              onCreated={refreshAuth}
+            />
+          ) : (
+            <PanelSkeleton />
+          )}
+        </TabPanel>
+        {hasBoards && (
+          <TabPanel
+            idPrefix="shell"
+            value="edit"
+            active={activeTab === "edit"}
+            className={panelClass}
+          >
+            <EditLeaderboards
+              isAuthenticated={isAuthenticated}
+              onCreateBoard={() => setTab("create")}
+              onBoardsChanged={refreshAuth}
+            />
+          </TabPanel>
         )}
-        {tab === "create" && (
-          <CreateLeaderboard
-            isAuthenticated={isAuthenticated}
-            onCreated={refreshAuth}
-          />
-        )}
-        {tab === "edit" && hasBoards && (
-          <EditLeaderboards isAuthenticated={isAuthenticated} />
-        )}
-      </main>
-    </div>
+      </Container>
+    </>
   );
 }
