@@ -22,8 +22,11 @@ export function ConfigBanner() {
           Set <code className={code}>NEXT_PUBLIC_SUPABASE_URL</code> to your
           Supabase project URL (
           <code className={code}>https://xxx.supabase.co</code>) and{" "}
-          <code className={code}>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to your
-          publishable key in your Vercel environment variables, then redeploy.
+          <code className={code}>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> (or{" "}
+          <code className={code}>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code>) to
+          your publishable key, in <code className={code}>.env.local</code>{" "}
+          locally or in your Vercel environment variables. Then restart the dev
+          server or redeploy.
         </Notice>
       </Container>
     </div>
