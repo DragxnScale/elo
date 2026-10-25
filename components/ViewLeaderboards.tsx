@@ -26,6 +26,8 @@ type ViewLeaderboardsProps = {
   isAuthenticated: boolean;
   /** Lets the empty state send the viewer to the create tab. */
   onCreateBoard?: () => void;
+  /** After joining or leaving, so the shell can refresh (e.g. the Edit tab). */
+  onMembershipChanged?: () => void;
 };
 
 /** The viewer's boards once fetched: `ok: false` means the request failed. */
@@ -55,6 +57,7 @@ function codeFromUrl(): string | null {
 export function ViewLeaderboards({
   isAuthenticated,
   onCreateBoard,
+  onMembershipChanged,
 }: ViewLeaderboardsProps) {
   const headingId = useId();
 
@@ -188,6 +191,8 @@ export function ViewLeaderboards({
    */
   async function lookUp(code: string) {
     const ticket = ++lookupTicket.current;
+    // A newer code replaces any board waiting to be joined after sign-in.
+    pendingJoin.current = null;
     setCodeInput(code);
     setLookingUp(true);
     setCodeError(null);
@@ -209,15 +214,20 @@ export function ViewLeaderboards({
       if (ticket !== lookupTicket.current) return;
       if (!("error" in joined)) {
         const board = joined.leaderboard;
-        setFetched((prev) =>
-          prev?.ok && !prev.boards.some((b) => b.id === board.id)
-            ? { ok: true, boards: [...prev.boards, board] }
-            : prev
-        );
-        setExternal(null);
-        setSelectedId(board.id);
+        if (fetched?.ok) {
+          if (!boards.some((b) => b.id === board.id)) {
+            setFetched({ ok: true, boards: [...fetched.boards, board] });
+          }
+          setExternal(null);
+          setSelectedId(board.id);
+        } else {
+          // Your list failed to load: show the board on its own.
+          setExternal(board);
+          setSelectedId(null);
+        }
         setMembershipKey((k) => k + 1);
         setLookingUp(false);
+        if (joined.status !== "member") onMembershipChanged?.();
         if (joined.status === "joined") {
           setNotice({
             tone: "success",
@@ -277,7 +287,9 @@ export function ViewLeaderboards({
   // Invite link, or a board opened before signing in: open (and join) it once
   // the viewer's own boards are known, so a code for a board they already
   // have just selects it.
-  const boardsKnown = !isAuthenticated || fetched !== null;
+  // Signed in, wait for a successful list: joining a board you own because
+  // the list failed to load would add you to it as a player.
+  const boardsKnown = !isAuthenticated || fetched?.ok === true;
   useEffect(() => {
     if (!boardsKnown) return;
     let code: string | null = null;
@@ -302,13 +314,16 @@ export function ViewLeaderboards({
     const board = active;
     setLeaving(true);
     setLeaveError(undefined);
-    const result = await leaveBoard(board.id);
+    const result = await leaveBoard(board.id).catch(() => ({
+      error: "Couldn't reach the server. Sign in again if you've been away, then retry.",
+    }));
     setLeaving(false);
     setLeaveOpen(false);
-    if (result.error) {
+    if ("error" in result && result.error) {
       setLeaveError(result.error);
       return;
     }
+    onMembershipChanged?.();
     setMembershipKey((k) => k + 1);
     setNotice({
       tone: "info",

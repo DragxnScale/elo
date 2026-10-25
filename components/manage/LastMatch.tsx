@@ -66,14 +66,16 @@ export function LastMatch({
   }, [leaderboardId, refreshKey]);
 
   const nameOf = (id: string) =>
-    players.find((p) => p.id === id)?.name ?? "A removed player";
+    players.find((p) => p.id === id)?.name ?? "A former player";
 
   async function undo() {
     if (!match) return;
     setBusy(true);
     setError(undefined);
-    const result = await undoLastMatch(leaderboardId);
-    if (result.error) {
+    const result = await undoLastMatch(leaderboardId).catch(() => ({
+      error: "Couldn't reach the server. Sign in again if you've been away, then retry.",
+    }));
+    if ("error" in result && result.error) {
       setBusy(false);
       setConfirming(false);
       setError(result.error);

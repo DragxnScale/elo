@@ -26,6 +26,8 @@ type MembersProps = {
   leaderboardId: string;
   /** The viewer's role on this board. */
   role: BoardRole;
+  /** The board owner's account: admins can't remove the owner's player. */
+  ownerId: string;
   /** Bump to reload (after a match, a new player...). */
   refreshKey: number;
   /** Reload players and rankings after a change here. */
@@ -40,7 +42,7 @@ const onBoard = (m: BoardMember) => !m.status || m.status === "active";
  * regular players. The database enforces all of this; the buttons only show
  * what will work.
  */
-export function Members({ leaderboardId, role, refreshKey, onChanged }: MembersProps) {
+export function Members({ leaderboardId, role, ownerId, refreshKey, onChanged }: MembersProps) {
   const isOwner = role === "owner";
   const [members, setMembers] = useState<BoardMember[] | null>(null);
   const [loadError, setLoadError] = useState<string | undefined>();
@@ -78,16 +80,25 @@ export function Members({ leaderboardId, role, refreshKey, onChanged }: MembersP
   ) {
     setBusy(member.id);
     setErrors((e) => ({ ...e, [member.id]: undefined }));
-    const result = await run();
-    if (result.error) {
-      setBusy(null);
-      setErrors((e) => ({ ...e, [member.id]: result.error }));
+    try {
+      const result = await run();
+      if (result.error) {
+        setErrors((e) => ({ ...e, [member.id]: result.error }));
+        return false;
+      }
+      setAnnouncement(done);
+      await onChanged();
+      return true;
+    } catch {
+      // Expired session or network: say so instead of spinning forever.
+      setErrors((e) => ({
+        ...e,
+        [member.id]: "Couldn't reach the server. Sign in again if you've been away, then retry.",
+      }));
       return false;
+    } finally {
+      setBusy(null);
     }
-    setAnnouncement(done);
-    await onChanged();
-    setBusy(null);
-    return true;
   }
 
   if (loadError) {
@@ -116,7 +127,7 @@ export function Members({ leaderboardId, role, refreshKey, onChanged }: MembersP
       <ul className="border-t border-border">
         {active.map((m) => {
           const isAdmin = m.role === "admin";
-          const canRemove = isOwner || !isAdmin;
+          const canRemove = isOwner || (!isAdmin && m.user_id !== ownerId);
           const rowBusy = busy === m.id;
           return (
             <li key={m.id} className="space-y-2 border-b border-border py-3">

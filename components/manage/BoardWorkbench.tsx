@@ -92,10 +92,12 @@ export function BoardWorkbench({
       <AddPlayer
         leaderboardId={board.id}
         onAdded={refreshPlayersAndTable}
+        canLink={role === "owner"}
       />
       <Members
         leaderboardId={board.id}
         role={role}
+        ownerId={board.user_id}
         refreshKey={tableKey}
         onChanged={refreshPlayersAndTable}
       />

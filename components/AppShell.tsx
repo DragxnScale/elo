@@ -107,6 +107,16 @@ export function AppShell() {
     };
   }, []);
 
+  // Being made (or unmade) an admin happens on someone else's screen; pick it
+  // up when the person comes back to the tab.
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") void refreshAuth();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refreshAuth]);
+
   // Derived, not stored: losing the last board while on Edit falls back to View.
   const activeTab: Tab = tab === "edit" && !hasBoards ? "view" : tab;
 
@@ -145,6 +155,7 @@ export function AppShell() {
             <ViewLeaderboards
               isAuthenticated={isAuthenticated}
               onCreateBoard={() => setTab("create")}
+              onMembershipChanged={refreshAuth}
             />
           ) : (
             <PanelSkeleton />

@@ -83,8 +83,62 @@ $$;
 
 grant execute on function public.board_role(uuid) to anon, authenticated;
 
--- 4. Record a match: owner or admin. Same signature as 002, now definer
---    with an explicit role check so admins can use it.
+-- 4a. The rating change for a match, computed exactly as lib/elo.ts
+--     calculateEloChange does (same constants; JavaScript's Math.round is
+--     floor(x + 0.5)). The database uses this rather than trusting a change
+--     sent by the app.
+create or replace function public.elo_change(
+  p_elo1 integer,
+  p_elo2 integer,
+  p_score1 integer,
+  p_score2 integer,
+  out change1 integer,
+  out change2 integer
+)
+language plpgsql
+immutable
+set search_path = public
+as $$
+declare
+  v_winner integer;
+  v_loser integer;
+  v_expected double precision;
+  v_base double precision;
+  v_upset double precision;
+  v_margin double precision;
+  v_gain integer;
+  v_loss integer;
+begin
+  if p_score1 = p_score2 then
+    change1 := 0;
+    change2 := 0;
+    return;
+  end if;
+
+  if p_score1 > p_score2 then
+    v_winner := p_elo1; v_loser := p_elo2;
+  else
+    v_winner := p_elo2; v_loser := p_elo1;
+  end if;
+
+  v_expected := 1.0 / (1.0 + power(10.0::double precision, (v_loser - v_winner)::double precision / 400.0));
+  v_base := 32.0 * (1.0 - v_expected);
+  v_upset := 1.0 + greatest(0, v_loser - v_winner)::double precision / 250.0;
+  v_margin := least(10.0, 1.0 + power(abs(p_score1 - p_score2)::double precision / 25.0, 0.75));
+  v_gain := floor(greatest(40.0, v_base) * v_upset * v_margin + 0.5)::integer;
+  v_loss := floor(v_gain * 0.75 + 0.5)::integer;
+
+  if p_score1 > p_score2 then
+    change1 := v_gain; change2 := -v_loss;
+  else
+    change1 := -v_loss; change2 := v_gain;
+  end if;
+end;
+$$;
+
+-- 4b. Record a match: owner or admin. Same signature as 002 so the app keeps
+--     working, but the change arguments are now ignored: the change is
+--     computed here from the locked ratings and the scores.
 create or replace function public.record_match(
   p_leaderboard_id uuid,
   p_player1_id uuid,
@@ -104,6 +158,8 @@ as $$
 declare
   v_elo1 integer;
   v_elo2 integer;
+  v_change1 integer;
+  v_change2 integer;
   v_match public.matches;
 begin
   if public.board_role(p_leaderboard_id) is null then
@@ -129,8 +185,11 @@ begin
     raise exception 'Ratings changed since this match was previewed.' using errcode = '40001';
   end if;
 
-  update public.players set elo = v_elo1 + p_player1_change where id = p_player1_id;
-  update public.players set elo = v_elo2 + p_player2_change where id = p_player2_id;
+  select change1, change2 into v_change1, v_change2
+    from public.elo_change(v_elo1, v_elo2, p_player1_score, p_player2_score);
+
+  update public.players set elo = v_elo1 + v_change1 where id = p_player1_id;
+  update public.players set elo = v_elo2 + v_change2 where id = p_player2_id;
 
   insert into public.matches (
     leaderboard_id, player1_id, player2_id,
@@ -142,7 +201,7 @@ begin
     p_leaderboard_id, p_player1_id, p_player2_id,
     p_player1_score, p_player2_score,
     v_elo1, v_elo2,
-    p_player1_change, p_player2_change,
+    v_change1, v_change2,
     auth.uid()
   )
   returning * into v_match;
@@ -176,23 +235,31 @@ begin
     raise exception 'There are no matches to undo.' using errcode = 'P0002';
   end if;
 
-  select elo into v_elo1 from public.players where id = v_match.player1_id for update;
-  select elo into v_elo2 from public.players where id = v_match.player2_id for update;
+  select elo into v_elo1 from public.players
+    where id = v_match.player1_id and leaderboard_id = p_leaderboard_id for update;
+  select elo into v_elo2 from public.players
+    where id = v_match.player2_id and leaderboard_id = p_leaderboard_id for update;
+
+  if v_elo1 is null or v_elo2 is null then
+    raise exception 'That match has players from another board.' using errcode = '22023';
+  end if;
 
   if v_elo1 is distinct from v_match.player1_elo_before + v_match.player1_change
      or v_elo2 is distinct from v_match.player2_elo_before + v_match.player2_change then
     raise exception 'Ratings changed since this match. Refresh and try again.' using errcode = '40001';
   end if;
 
-  update public.players set elo = v_match.player1_elo_before where id = v_match.player1_id;
-  update public.players set elo = v_match.player2_elo_before where id = v_match.player2_id;
+  update public.players set elo = v_match.player1_elo_before
+    where id = v_match.player1_id and leaderboard_id = p_leaderboard_id;
+  update public.players set elo = v_match.player2_elo_before
+    where id = v_match.player2_id and leaderboard_id = p_leaderboard_id;
   delete from public.matches where id = v_match.id;
 
   return v_match;
 end;
 $$;
 
--- 6. Add a player (owner or admin), optionally linked to an account.
+-- 6. Add a player (owner or admin). Linking it to an account: owner only.
 create or replace function public.add_player(
   p_leaderboard_id uuid,
   p_name text,
@@ -219,6 +286,9 @@ begin
   select starting_elo into v_starting from public.leaderboards where id = p_leaderboard_id;
 
   if coalesce(btrim(p_username), '') <> '' then
+    if public.board_role(p_leaderboard_id) <> 'owner' then
+      raise exception 'Only the board owner can link accounts.' using errcode = '42501';
+    end if;
     select id into v_user from public.profiles where username = lower(btrim(p_username));
     if v_user is null then
       raise exception 'No account named "%".', lower(btrim(p_username)) using errcode = 'P0002';
@@ -382,7 +452,11 @@ begin
     raise exception 'Only the board owner or an admin can remove players.' using errcode = '42501';
   end if;
 
-  if v_role = 'admin' and (v_player.role = 'admin' or v_player.user_id = auth.uid()) then
+  if v_role = 'admin' and (
+    v_player.role = 'admin'
+    or v_player.user_id = auth.uid()
+    or v_player.user_id = (select user_id from public.leaderboards where id = v_player.leaderboard_id)
+  ) then
     raise exception 'Admins can only remove regular players.' using errcode = '42501';
   end if;
 
@@ -482,3 +556,45 @@ grant execute on function public.record_match(
   uuid, uuid, uuid, integer, integer, integer, integer, integer, integer
 ) to authenticated;
 grant execute on function public.undo_last_match(uuid) to authenticated;
+
+-- 13. Lock down direct writes. Ratings and matches change only through the
+--     functions above (which check roles, keep players on their own board
+--     and log manual changes). Owners keep direct updates to names, account
+--     links, roles and status, which the app uses for linking accounts.
+drop policy if exists "Owners record matches" on public.matches;
+revoke insert, update on public.matches from anon, authenticated;
+revoke insert, update on public.players from anon, authenticated;
+grant update (name, user_id, role, status) on public.players to authenticated;
+revoke insert, update, delete on public.rating_adjustments from anon, authenticated;
+
+-- 14. A match's players must belong to the match's board. Added NOT VALID so
+--     it can't fail on existing rows; validated when the existing data allows.
+do $$
+begin
+  alter table public.players add constraint players_id_leaderboard_key unique (id, leaderboard_id);
+exception when duplicate_table or duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter table public.matches add constraint matches_player1_same_board
+    foreign key (player1_id, leaderboard_id) references public.players (id, leaderboard_id)
+    on delete cascade not valid;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter table public.matches add constraint matches_player2_same_board
+    foreign key (player2_id, leaderboard_id) references public.players (id, leaderboard_id)
+    on delete cascade not valid;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter table public.matches validate constraint matches_player1_same_board;
+  alter table public.matches validate constraint matches_player2_same_board;
+exception when foreign_key_violation then
+  raise notice 'Some existing matches reference players from another board; new matches are still checked.';
+end $$;
