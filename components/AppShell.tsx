@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getMyLeaderboards, getSessionProfile } from "@/app/actions";
+import { getManagedBoards, getSessionProfile } from "@/app/actions";
 import { ViewLeaderboards } from "@/components/ViewLeaderboards";
 import { CreateLeaderboard } from "@/components/CreateLeaderboard";
 import { EditLeaderboards } from "@/components/EditLeaderboards";
@@ -50,8 +50,9 @@ async function loadAuthState(): Promise<LoadedAuth | null> {
   }
   let hasBoards: boolean | null = null;
   try {
-    const result = await getMyLeaderboards();
-    if (!("error" in result)) hasBoards = result.leaderboards.length > 0;
+    // Boards you own or are an admin of: the ones the Edit tab works on.
+    const result = await getManagedBoards();
+    if (!("error" in result)) hasBoards = result.boards.length > 0;
   } catch {
     // Leave hasBoards unknown; the signed-in state is still right.
   }

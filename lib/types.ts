@@ -13,8 +13,17 @@ export type Player = {
   name: string;
   elo: number;
   user_id: string | null;
+  /** 'admin' can record matches and manage players. Missing before migration 004. */
+  role?: "player" | "admin";
+  /** 'left' and 'removed' players keep their history but leave the rankings. */
+  status?: "active" | "left" | "removed";
   created_at: string;
 };
+
+/** What the signed-in person may do on a board. */
+export type BoardRole = "owner" | "admin";
+
+export type BoardMember = Player & { username: string | null };
 
 export type Profile = {
   id: string;

@@ -5,7 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 import { generateShareCode } from "@/lib/codes";
 import { usernameToEmail, normalizeUsername, isValidUsername } from "@/lib/auth";
 import { calculateEloChange } from "@/lib/elo";
-import type { Leaderboard, Match, Player, Profile } from "@/lib/types";
+import type {
+  BoardMember,
+  BoardRole,
+  Leaderboard,
+  Match,
+  Player,
+  Profile,
+} from "@/lib/types";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -170,58 +177,46 @@ export async function getPlayers(leaderboardId: string) {
     .order("elo", { ascending: false });
 
   if (error) return { error: error.message, players: [] };
-  return { players: data ?? [] };
+  return { players: ((data ?? []) as Player[]).filter(isOnBoard) };
 }
+
+/** Players who left or were removed keep their history but leave the rankings. */
+function isOnBoard(player: Player): boolean {
+  return !player.status || player.status === "active";
+}
+
+const MIGRATION_004 =
+  "The database needs an update. Run supabase/migrations/004_members_and_roles.sql in the Supabase SQL Editor.";
 
 export async function addPlayer(
   leaderboardId: string,
   name: string,
   username?: string
 ) {
-  const { supabase, user } = await requireUser();
+  const { supabase } = await requireUser();
   const trimmed = name.trim();
   if (!trimmed) return { error: "Player name is required." };
 
-  let linkedUserId: string | null = null;
-  if (username?.trim()) {
-    const found = await findProfileId(supabase, username);
-    if ("error" in found) return { error: found.error };
-    linkedUserId = found.id;
-  }
-
-  const { data: lb } = await supabase
-    .from("leaderboards")
-    .select("starting_elo")
-    .eq("id", leaderboardId)
-    .eq("user_id", user.id)
-    .single();
-
-  if (!lb) return { error: "Leaderboard not found." };
-
-  const { data, error } = await supabase
-    .from("players")
-    .insert({
-      leaderboard_id: leaderboardId,
-      name: trimmed,
-      elo: lb.starting_elo,
-      user_id: linkedUserId,
-    })
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc("add_player", {
+    p_leaderboard_id: leaderboardId,
+    p_name: trimmed,
+    p_username: username?.trim() ? normalizeUsername(username) : null,
+  });
 
   if (error) {
+    if (error.code === "PGRST202") return { error: MIGRATION_004 };
     if (error.code === "23505") {
       return {
-        error: linkedUserId
+        error: username?.trim()
           ? "That name or account is already on this leaderboard."
-          : "Player already exists.",
+          : "A player with that name is already on this board (or was removed from it).",
       };
     }
     return { error: error.message };
   }
 
   revalidatePath("/");
-  return { player: data };
+  return { player: data as Player };
 }
 
 export async function applyMatchToLeaderboard(
@@ -231,7 +226,7 @@ export async function applyMatchToLeaderboard(
   player1Score: number,
   player2Score: number
 ) {
-  const { supabase, user } = await requireUser();
+  const { supabase } = await requireUser();
 
   if (player1Id === player2Id) {
     return { error: "Pick two different players." };
@@ -239,15 +234,6 @@ export async function applyMatchToLeaderboard(
   if (player1Score === player2Score) {
     return { error: "Tie game — no ELO change." };
   }
-
-  const { data: lb } = await supabase
-    .from("leaderboards")
-    .select("id")
-    .eq("id", leaderboardId)
-    .eq("user_id", user.id)
-    .single();
-
-  if (!lb) return { error: "Leaderboard not found." };
 
   const { data: players, error: fetchError } = await supabase
     .from("players")
@@ -353,10 +339,14 @@ export async function linkPlayerToAccount(playerId: string, username: string | n
     userId = found.id;
   }
 
-  const { error } = await supabase
+  let { error } = await supabase
     .from("players")
-    .update({ user_id: userId })
+    .update({ user_id: userId, role: "player" })
     .eq("id", playerId);
+  // Before migration 004 there is no role column.
+  if (error?.code === "PGRST204") {
+    ({ error } = await supabase.from("players").update({ user_id: userId }).eq("id", playerId));
+  }
 
   if (error) {
     if (error.code === "23505") {
@@ -379,10 +369,11 @@ export async function getBoardsIPlayIn() {
 
   const { data } = await supabase
     .from("players")
-    .select("leaderboards(*)")
+    .select("*, leaderboards(*)")
     .eq("user_id", user.id);
 
   const leaderboards = (data ?? [])
+    .filter((row) => isOnBoard(row as Player))
     .map((row) => row.leaderboards as unknown as Leaderboard | null)
     .filter((lb): lb is Leaderboard => lb !== null);
   return { leaderboards };
@@ -447,7 +438,9 @@ export async function getPlayerDetail(playerId: string) {
     leaderboard: leaderboard as Leaderboard,
     matches: (matches ?? []) as Match[],
     players,
-    rank: players.findIndex((p) => p.id === playerId) + 1,
+    // Rank among players still on the board; 0 if this one left or was removed.
+    rank: players.filter(isOnBoard).findIndex((p) => p.id === playerId) + 1,
+    boardSize: players.filter(isOnBoard).length,
     username: player.user_id ? usernames.get(player.user_id) ?? null : null,
     usernames: Object.fromEntries(usernames),
   };
@@ -497,4 +490,207 @@ export async function getProfileDetail(username: string) {
   }
 
   return { profile: profile as Profile, players, matches, opponents };
+}
+
+// ---------------------------------------------------------------------------
+// Members, admins and joining by code (migration 004)
+// ---------------------------------------------------------------------------
+
+/** The signed-in person's role on a board, or null if they can't manage it. */
+async function boardRoleFor(
+  supabase: SupabaseServer,
+  leaderboardId: string
+): Promise<BoardRole | null> {
+  const { data, error } = await supabase.rpc("board_role", {
+    p_leaderboard_id: leaderboardId,
+  });
+  if (!error) return (data as BoardRole | null) ?? null;
+
+  // Before migration 004 only owners manage boards.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: lb } = await supabase
+    .from("leaderboards")
+    .select("id")
+    .eq("id", leaderboardId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  return lb ? "owner" : null;
+}
+
+/** Boards the signed-in person can manage: ones they own, then ones they're an admin of. */
+export async function getManagedBoards() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { boards: [] as (Leaderboard & { role: BoardRole })[] };
+
+  const [{ data: owned, error }, { data: adminRows }] = await Promise.all([
+    supabase
+      .from("leaderboards")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false }),
+    // Errors before migration 004 (no role column); then there are no admins.
+    supabase
+      .from("players")
+      .select("leaderboards(*)")
+      .eq("user_id", user.id)
+      .eq("role", "admin")
+      .eq("status", "active"),
+  ]);
+
+  if (error) return { error: error.message, boards: [] as (Leaderboard & { role: BoardRole })[] };
+
+  const boards: (Leaderboard & { role: BoardRole })[] = (owned ?? []).map(
+    (lb) => ({ ...(lb as Leaderboard), role: "owner" as const })
+  );
+  for (const row of adminRows ?? []) {
+    const lb = row.leaderboards as unknown as Leaderboard | null;
+    if (lb && !boards.some((b) => b.id === lb.id)) boards.push({ ...lb, role: "admin" });
+  }
+  return { boards };
+}
+
+export type JoinResult =
+  | { error: string }
+  | {
+      status: "joined" | "rejoined" | "member";
+      playerId: string;
+      leaderboard: Leaderboard;
+    };
+
+/**
+ * Join a board with its share code: you're added as a player linked to your
+ * account at the board's starting rating. Already on it: nothing changes.
+ */
+export async function joinBoardByCode(shareCode: string): Promise<JoinResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sign in to join this board." };
+
+  const { data, error } = await supabase.rpc("join_board", {
+    p_share_code: shareCode,
+  });
+  if (error) {
+    if (error.code === "PGRST202") return { error: MIGRATION_004 };
+    return { error: error.message };
+  }
+
+  const result = data as {
+    status: "joined" | "rejoined" | "member";
+    player_id: string;
+    leaderboard_id: string;
+  };
+  const { data: leaderboard } = await supabase
+    .from("leaderboards")
+    .select("*")
+    .eq("id", result.leaderboard_id)
+    .single();
+
+  if (result.status !== "member") revalidatePath("/");
+  return {
+    status: result.status,
+    playerId: result.player_id,
+    leaderboard: leaderboard as Leaderboard,
+  };
+}
+
+/** Your own player on a board, if you're on it. */
+export async function getMyPlayer(leaderboardId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { player: null };
+  const { data } = await supabase
+    .from("players")
+    .select("*")
+    .eq("leaderboard_id", leaderboardId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const player = data as Player | null;
+  return { player: player && isOnBoard(player) ? player : null };
+}
+
+/** Leave a board. Your rating and history stay; the code brings you back. */
+export async function leaveBoard(leaderboardId: string) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("leave_board", {
+    p_leaderboard_id: leaderboardId,
+  });
+  if (error) {
+    if (error.code === "PGRST202") return { error: MIGRATION_004 };
+    return { error: error.message };
+  }
+  revalidatePath("/");
+  return { success: true };
+}
+
+/** Everyone on a board, including those who left or were removed, plus your role. */
+export async function getBoardMembers(leaderboardId: string) {
+  const supabase = await createClient();
+  const [{ data, error }, role] = await Promise.all([
+    supabase
+      .from("players")
+      .select("*")
+      .eq("leaderboard_id", leaderboardId)
+      .order("elo", { ascending: false }),
+    boardRoleFor(supabase, leaderboardId),
+  ]);
+  if (error) return { error: error.message, members: [] as BoardMember[], role };
+
+  const players = (data ?? []) as Player[];
+  const usernames = await usernamesFor(
+    supabase,
+    players.map((p) => p.user_id).filter((id): id is string => !!id)
+  );
+  const members: BoardMember[] = players.map((p) => ({
+    ...p,
+    username: p.user_id ? usernames.get(p.user_id) ?? null : null,
+  }));
+  return { members, role };
+}
+
+async function memberRpc(fn: string, args: Record<string, unknown>) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc(fn, args);
+  if (error) {
+    if (error.code === "PGRST202") return { error: MIGRATION_004 };
+    return { error: error.message };
+  }
+  revalidatePath("/");
+  return { success: true as const };
+}
+
+/** Owner only: make a linked player an admin, or back to a player. */
+export async function setPlayerRole(playerId: string, role: "player" | "admin") {
+  return memberRpc("set_player_role", { p_player_id: playerId, p_role: role });
+}
+
+/** Owner: anyone. Admin: regular players. Their history stays; they can't rejoin by code. */
+export async function removePlayer(playerId: string) {
+  return memberRpc("remove_player", { p_player_id: playerId });
+}
+
+/** Owner only: put a removed or departed player back on the board. */
+export async function restorePlayer(playerId: string) {
+  return memberRpc("restore_player", { p_player_id: playerId });
+}
+
+/** Owner only: set a player's rating by hand. Logged with the optional reason. */
+export async function adjustRating(playerId: string, newElo: number, reason?: string) {
+  if (!Number.isInteger(newElo) || newElo < 0 || newElo > 100000) {
+    return { error: "Rating must be a whole number between 0 and 100000." };
+  }
+  return memberRpc("adjust_rating", {
+    p_player_id: playerId,
+    p_new_elo: newElo,
+    p_reason: reason?.trim() || null,
+  });
 }

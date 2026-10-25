@@ -5,17 +5,24 @@ import { getPlayers } from "@/app/actions";
 import { LeaderboardTable } from "@/components/LeaderboardTable";
 import { AddPlayer } from "@/components/manage/AddPlayer";
 import { LastMatch } from "@/components/manage/LastMatch";
-import { LinkedAccounts } from "@/components/manage/LinkedAccounts";
+import { Members } from "@/components/manage/Members";
 import { RecordMatch } from "@/components/manage/RecordMatch";
 import { Section } from "@/components/ui/section";
-import type { Leaderboard, Player } from "@/lib/types";
+import type { BoardRole, Leaderboard, Player } from "@/lib/types";
 
 /**
  * Everything you do to one board. Render with `key={board.id}` so all form
  * state (selections, scores, drafts, preview, errors) resets on a board switch
  * without any effect.
  */
-export function BoardWorkbench({ board }: { board: Leaderboard }) {
+export function BoardWorkbench({
+  board,
+  role,
+}: {
+  board: Leaderboard;
+  /** Owner or admin: both record matches and add players; owner-only controls sit in Members. */
+  role: BoardRole;
+}) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [playersLoaded, setPlayersLoaded] = useState(false);
   const [playersError, setPlayersError] = useState<string | undefined>();
@@ -86,9 +93,12 @@ export function BoardWorkbench({ board }: { board: Leaderboard }) {
         leaderboardId={board.id}
         onAdded={refreshPlayersAndTable}
       />
-      {playersLoaded && players.length > 0 && (
-        <LinkedAccounts players={players} onChanged={refreshPlayers} />
-      )}
+      <Members
+        leaderboardId={board.id}
+        role={role}
+        refreshKey={tableKey}
+        onChanged={refreshPlayersAndTable}
+      />
     </div>
   );
 }

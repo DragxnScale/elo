@@ -79,5 +79,5 @@ create policy "Owners manage players"
 -- Realtime
 alter publication supabase_realtime add table public.players;
 
--- Then run supabase/migrations/002_accounts_and_stats.sql and 003_undo_last_match.sql
+-- Then run supabase/migrations/002, 003 and 004 in order.
 -- (player ↔ account linking, match history, record_match()).
