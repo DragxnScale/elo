@@ -1,6 +1,13 @@
 export function getSupabaseEnv() {
   const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? "";
+  // Supabase's "Connect" panel now names this NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  // accept either name. Each must be written out in full so Next.js can inline
+  // it into the browser bundle.
+  const anonKey = (
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    ""
+  ).trim();
 
   let url = "";
   if (rawUrl) {
