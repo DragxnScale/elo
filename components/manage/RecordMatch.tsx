@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { applyMatchToLeaderboard } from "@/app/actions";
+import { applyMatchToLeaderboard, getGamesPlayed } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { Section } from "@/components/ui/section";
 import { Select } from "@/components/ui/select";
-import { Live } from "@/components/manage/live";
 import { MatchPreview, describeResult } from "@/components/manage/MatchPreview";
 import type { PendingPreview } from "@/components/manage/MatchPreview";
 import { ScoreInput } from "@/components/manage/ScoreInput";
@@ -55,7 +54,7 @@ export function RecordMatch({
   const [player2Points, setPlayer2Points] = useState("");
   const [errors, setErrors] = useState<MatchFieldErrors>({});
   const [pending, setPending] = useState<PendingPreview | null>(null);
-  const [tie, setTie] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [applying, setApplying] = useState(false);
   const [confirmError, setConfirmError] = useState<string | undefined>();
   const [success, setSuccess] = useState<string | null>(null);
@@ -80,10 +79,9 @@ export function RecordMatch({
     setRetrying(false);
   }
 
-  /** Any edit drops the preview, the tie notice and the success notice. */
+  /** Any edit drops the preview and the success notice. */
   function dropResults() {
     setPending(null);
-    setTie(false);
     setSuccess(null);
     setConfirmError(undefined);
   }
@@ -129,7 +127,7 @@ export function RecordMatch({
     };
   }
 
-  function handlePreview() {
+  async function handlePreview() {
     setSuccess(null);
     setConfirmError(undefined);
     const validated = validate();
@@ -142,7 +140,6 @@ export function RecordMatch({
       validated.score2 === undefined
     ) {
       setPending(null);
-      setTie(false);
       // First invalid control in visual order.
       const { errors: e } = validated;
       if (e.player1) player1Ref.current?.focus();
@@ -152,26 +149,24 @@ export function RecordMatch({
       return;
     }
 
-    if (validated.score1 === validated.score2) {
-      setTie(true);
-      setPending(null);
-      return;
-    }
-
-    setTie(false);
+    // Experience cushions losses, so the preview needs games played. A failed
+    // lookup previews as if both were new; the database computes the real
+    // change when the match is confirmed either way.
+    const { player1, player2, score1, score2 } = validated;
+    setPreviewing(true);
+    const played = await getGamesPlayed(leaderboardId).catch(() => ({ games: {} as Record<string, number> }));
+    setPreviewing(false);
     setPending({
-      player1Id: validated.player1.id,
-      player2Id: validated.player2.id,
-      player1Name: validated.player1.name,
-      player2Name: validated.player2.name,
-      player1Score: validated.score1,
-      player2Score: validated.score2,
-      result: calculateEloChange(
-        validated.player1.elo,
-        validated.player2.elo,
-        validated.score1,
-        validated.score2
-      ),
+      player1Id: player1.id,
+      player2Id: player2.id,
+      player1Name: player1.name,
+      player2Name: player2.name,
+      player1Score: score1,
+      player2Score: score2,
+      result: calculateEloChange(player1.elo, player2.elo, score1, score2, {
+        player1: played.games[player1.id] ?? 0,
+        player2: played.games[player2.id] ?? 0,
+      }),
     });
   }
 
@@ -314,19 +309,6 @@ export function RecordMatch({
           </div>
         </div>
 
-        <Live>
-          {tie && (
-            <Notice
-              role="none"
-              tone="info"
-              title="Tie game — no ELO change."
-              className="mt-6"
-            >
-              Change a score to record a winner.
-            </Notice>
-          )}
-        </Live>
-
         <div className="mt-6">
           {pending ? (
             <MatchPreview
@@ -340,6 +322,7 @@ export function RecordMatch({
             <Button
               size="lg"
               className="w-full sm:w-auto sm:min-w-40"
+              loading={previewing}
               onClick={handlePreview}
             >
               Preview

@@ -108,7 +108,7 @@ export default async function ProfilePage({ params }: Props) {
                     {leaderboard.name}
                   </TextLink>
                 </TableCell>
-                <TableCell numeric>{formatRecord(stats.wins, stats.losses)}</TableCell>
+                <TableCell numeric>{formatRecord(stats.wins, stats.losses, stats.draws)}</TableCell>
                 <TableCell numeric className="hidden min-[24rem]:table-cell">
                   {formatWinRate(stats.winRate)}
                 </TableCell>

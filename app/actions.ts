@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { generateShareCode } from "@/lib/codes";
 import { usernameToEmail, normalizeUsername, isValidUsername } from "@/lib/auth";
-import { calculateEloChange } from "@/lib/elo";
 import type {
   BoardMember,
   BoardRole,
@@ -231,9 +230,6 @@ export async function applyMatchToLeaderboard(
   if (player1Id === player2Id) {
     return { error: "Pick two different players." };
   }
-  if (player1Score === player2Score) {
-    return { error: "Tie game — no ELO change." };
-  }
 
   const { data: players, error: fetchError } = await supabase
     .from("players")
@@ -249,13 +245,8 @@ export async function applyMatchToLeaderboard(
   const player2 = players.find((p) => p.id === player2Id);
   if (!player1 || !player2) return { error: "Invalid match players." };
 
-  const change = calculateEloChange(
-    player1.elo,
-    player2.elo,
-    player1Score,
-    player2Score
-  );
-
+  // The database computes the rating change itself (elo_change); the change
+  // arguments below are ignored and kept only for the function's signature.
   const { data: match, error: rpcError } = await supabase.rpc("record_match", {
     p_leaderboard_id: leaderboardId,
     p_player1_id: player1Id,
@@ -264,8 +255,8 @@ export async function applyMatchToLeaderboard(
     p_player2_score: player2Score,
     p_player1_elo_before: player1.elo,
     p_player2_elo_before: player2.elo,
-    p_player1_change: change.player1Change,
-    p_player2_change: change.player2Change,
+    p_player1_change: 0,
+    p_player2_change: 0,
   });
 
   if (rpcError) {
@@ -275,11 +266,36 @@ export async function applyMatchToLeaderboard(
     if (rpcError.code === "PGRST202") {
       return { error: "Database is missing record_match(). Run supabase/migrations/002_accounts_and_stats.sql." };
     }
+    // Before migration 005 the database refuses ties.
+    if (player1Score === player2Score && ["22023", "23514"].includes(rpcError.code)) {
+      return {
+        error:
+          "Ties need a database update. Run supabase/migrations/005_elo_v2_ties.sql in the Supabase SQL Editor.",
+      };
+    }
     return { error: rpcError.message };
   }
 
   revalidatePath("/");
-  return { change, player1, player2, match: match as Match };
+  return { player1, player2, match: match as Match };
+}
+
+/**
+ * Games each player on a board has played, by player id. Experience cushions
+ * losses, so the match preview needs it.
+ */
+export async function getGamesPlayed(leaderboardId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("matches")
+    .select("player1_id, player2_id")
+    .eq("leaderboard_id", leaderboardId);
+  const games: Record<string, number> = {};
+  for (const m of data ?? []) {
+    games[m.player1_id] = (games[m.player1_id] ?? 0) + 1;
+    games[m.player2_id] = (games[m.player2_id] ?? 0) + 1;
+  }
+  return { games };
 }
 
 /** Undo the newest match on one of your boards: both ratings go back, the match is deleted. */

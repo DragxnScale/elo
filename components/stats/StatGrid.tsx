@@ -3,10 +3,16 @@ import { Stat, StatGroup } from "@/components/ui/stat";
 import { formatRecord } from "@/lib/utils";
 import { formatScore } from "./format";
 
-/** Spoken form of a streak letter: "3 wins in a row", "1 loss in a row". */
-function streakPhrase(result: "W" | "L", count: number): string {
-  const noun = result === "W" ? (count === 1 ? "win" : "wins") : count === 1 ? "loss" : "losses";
-  return `${count} ${noun} in a row`;
+const STREAK_NOUNS = {
+  W: ["win", "wins"],
+  L: ["loss", "losses"],
+  D: ["draw", "draws"],
+} as const;
+
+/** Spoken form of a streak letter: "3 wins in a row", "1 draw in a row". */
+function streakPhrase(result: "W" | "L" | "D", count: number): string {
+  const [one, many] = STREAK_NOUNS[result];
+  return `${count} ${count === 1 ? one : many} in a row`;
 }
 
 const none = <span className="text-muted-foreground">—</span>;
@@ -18,7 +24,7 @@ export function StatGrid({ stats, elo }: { stats: PlayerStats; elo?: number }) {
   return (
     <StatGroup columns={4}>
       {elo !== undefined && <Stat label="Rating" value={String(elo)} size="lg" />}
-      <Stat label="Record" value={formatRecord(stats.wins, stats.losses)} />
+      <Stat label="Record" value={formatRecord(stats.wins, stats.losses, stats.draws)} />
       <Stat label="Win rate" value={hasMatches ? formatWinRate(stats.winRate) : none} />
       <Stat
         label="W/L ratio"
@@ -26,7 +32,7 @@ export function StatGrid({ stats, elo }: { stats: PlayerStats; elo?: number }) {
       />
       <Stat
         label="Streak"
-        tone={streak ? (streak.result === "W" ? "win" : "loss") : undefined}
+        tone={streak && streak.result !== "D" ? (streak.result === "W" ? "win" : "loss") : undefined}
         value={
           streak ? (
             <>

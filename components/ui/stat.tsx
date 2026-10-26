@@ -76,22 +76,22 @@ export function Delta({ value, className, ...props }: DeltaProps) {
   );
 }
 
-/** A single match result letter, W or L. */
+/** A single match result letter: W, L, or D for a draw (no colour). */
 export function ResultMark({
   result,
   className,
 }: {
-  result: "W" | "L";
+  result: "W" | "L" | "D";
   className?: string;
 }) {
   return (
     <span
       className={cn(
         "font-semibold",
-        result === "W" ? "text-win" : "text-loss",
+        result === "W" ? "text-win" : result === "L" ? "text-loss" : "text-muted-foreground",
         className
       )}
-      aria-label={result === "W" ? "Win" : "Loss"}
+      aria-label={result === "W" ? "Win" : result === "L" ? "Loss" : "Draw"}
     >
       {result}
     </span>

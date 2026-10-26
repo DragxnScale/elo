@@ -32,7 +32,7 @@ type LeaderboardTableProps = {
   emptyDescription?: ReactNode;
 };
 
-type Records = Map<string, { wins: number; losses: number }>;
+type Records = Map<string, { wins: number; losses: number; draws: number }>;
 
 type TableData = {
   /** The board these rows belong to. A different id means "still loading". */
@@ -277,8 +277,9 @@ export function LeaderboardTable({
             const record = data.records.get(player.id) ?? {
               wins: 0,
               losses: 0,
+              draws: 0,
             };
-            const played = record.wins + record.losses;
+            const played = record.wins + record.losses + record.draws;
             return (
               <TableRow
                 key={player.id}
@@ -305,7 +306,7 @@ export function LeaderboardTable({
                   </TextLink>
                 </TableCell>
                 <TableCell numeric className="align-baseline whitespace-nowrap">
-                  {formatRecord(record.wins, record.losses)}
+                  {formatRecord(record.wins, record.losses, record.draws)}
                 </TableCell>
                 <TableCell
                   numeric

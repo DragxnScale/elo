@@ -15,7 +15,7 @@ export function formatSigned(value: number): string {
   return "0";
 }
 
-/** Win-loss record with an en dash: "12–4". */
-export function formatRecord(wins: number, losses: number): string {
-  return `${wins}–${losses}`;
+/** Win-loss record with en dashes: "12–4", or "12–4–1" once there are draws. */
+export function formatRecord(wins: number, losses: number, draws = 0): string {
+  return draws > 0 ? `${wins}–${losses}–${draws}` : `${wins}–${losses}`;
 }

@@ -117,7 +117,7 @@ export function LastMatch({
         >
           <div className="border-t border-border pt-3">
             <p className="text-base font-medium text-foreground">
-              {nameOf(winner.id)} beat {nameOf(loser.id)},{" "}
+              {nameOf(winner.id)} {winner.score === loser.score ? `and ${nameOf(loser.id)} tied` : `beat ${nameOf(loser.id)}`},{" "}
               <span className="whitespace-nowrap tabular-nums">
                 {formatScore(winner.score)} to {formatScore(loser.score)}
               </span>
