@@ -1,4 +1,5 @@
 import { calculateEloChange, experienceCushion, pointsShare } from "./elo";
+import { formatShare } from "./utils";
 
 function test(name: string, fn: () => void) {
   try {
@@ -100,4 +101,18 @@ test("changes apply to the right sides", () => {
   eq(r.outcome, "player2", "outcome");
   eq(r.player1NewElo, 1000 + r.player1Change, "p1 elo");
   eq(r.player2NewElo, 1200 + r.player2Change, "p2 elo");
+});
+
+test("expected shares are shown precisely, never rounded to 100% or 0%", () => {
+  const r = calculateEloChange(5000, 2000, 10, 10);
+  eq(formatShare(r.expectedScore), "99.9999968%", "favourite");
+  eq(formatShare(r.expectedScore2), "0.0000032%", "underdog");
+  eq(formatShare(calculateEloChange(1200, 1000, 1, 1).expectedScore), "76%", "ordinary");
+  eq(formatShare(calculateEloChange(1000, 1400, 1, 1).expectedScore), "9.1%", "one decimal");
+  eq(formatShare(calculateEloChange(2400, 1000, 1, 1).expectedScore2), "0.032%", "small");
+  const huge = calculateEloChange(100000, 1000, 3, 3);
+  eq(formatShare(huge.expectedScore), "≈100%", "beyond double precision");
+  eq(formatShare(huge.expectedScore2), "3.2 × 10⁻²⁴⁶%", "astronomically small");
+  eq(formatShare(1, { exact: true }), "100%", "a real shutout");
+  eq(formatShare(0.5), "50%", "even");
 });
