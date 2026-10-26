@@ -52,6 +52,11 @@ export type EloChangeResult = {
   player2NewElo: number;
   /** Player 1's expected share of the points, 0-1. */
   expectedScore: number;
+  /**
+   * Player 2's expected share, computed directly rather than as
+   * 1 - expectedScore, so a huge underdog's tiny share isn't lost to rounding.
+   */
+  expectedScore2: number;
   /** Player 1's actual share of the points, 0-1. */
   actualScore: number;
   /** The factor used: base K plus the rating-gap part. */
@@ -125,6 +130,7 @@ export function calculateEloChange(
     player1NewElo: player1Elo + player1Change,
     player2NewElo: player2Elo + player2Change,
     expectedScore: expected1,
+    expectedScore2: 1 / (1 + Math.pow(10, (player1Elo - player2Elo) / 400)),
     actualScore: actual1,
     k,
     player1Cushion: cushion1,

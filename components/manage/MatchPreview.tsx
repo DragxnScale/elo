@@ -7,6 +7,7 @@ import { Surface } from "@/components/ui/surface";
 import { Delta } from "@/components/ui/stat";
 import type { EloChangeResult } from "@/lib/elo";
 import { formatElo, formatScore } from "@/components/manage/format";
+import { formatShare } from "@/lib/utils";
 
 export type PendingPreview = {
   player1Id: string;
@@ -35,9 +36,9 @@ export function describeResult(pending: PendingPreview): string {
 /** Why the numbers are what they are, in one line. */
 function explain(pending: PendingPreview): string {
   const { result } = pending;
-  const pct = (x: number) => `${Math.round(x * 100)}%`;
   const parts = [
-    `${pending.player1Name} was expected to take ${pct(result.expectedScore)} of the points and took ${pct(result.actualScore)}`,
+    `Expected share of the points: ${pending.player1Name} ${formatShare(result.expectedScore)}, ${pending.player2Name} ${formatShare(result.expectedScore2)}`,
+    `actual: ${formatShare(result.actualScore, { exact: true })} / ${formatShare(1 - result.actualScore, { exact: true })}`,
     `factor ${Math.round(result.k)}`,
   ];
   const cushioned = [
