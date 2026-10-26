@@ -77,8 +77,8 @@ test("undefeated ratio equals wins", () => {
 
 test("headToHead groups by opponent", () => {
   eq(headToHead(playerMatches(matches, "a")), [
-    { opponentId: "b", wins: 2, losses: 1, played: 3 },
-    { opponentId: "c", wins: 1, losses: 0, played: 1 },
+    { opponentId: "b", wins: 2, losses: 1, draws: 0, played: 3 },
+    { opponentId: "c", wins: 1, losses: 0, draws: 0, played: 1 },
   ], "h2h");
 });
 
@@ -88,9 +88,9 @@ test("eloSeries starts at the first rating", () => {
 
 test("recordsByPlayer", () => {
   const r = recordsByPlayer(matches);
-  eq(r.get("a"), { wins: 3, losses: 1 }, "a");
-  eq(r.get("b"), { wins: 1, losses: 2 }, "b");
-  eq(r.get("c"), { wins: 0, losses: 1 }, "c");
+  eq(r.get("a"), { wins: 3, losses: 1, draws: 0 }, "a");
+  eq(r.get("b"), { wins: 1, losses: 2, draws: 0 }, "b");
+  eq(r.get("c"), { wins: 0, losses: 1, draws: 0 }, "c");
 });
 
 test("dailyActivity buckets by UTC day, oldest first", () => {
@@ -107,4 +107,20 @@ test("dailyActivity buckets by UTC day, oldest first", () => {
   );
   eq(endDate, "2026-01-10", "end date");
   eq(data, [1, 0, 0, 0, 0, 0, 2], "counts");
+});
+
+test("draws count as games, break win streaks and show in records", () => {
+  const withDraw = [
+    match("a", "b", 10, 5, 1000, 1000, 52, -39),
+    match("a", "b", 7, 7, 1052, 961, -6, 8),
+    match("b", "a", 3, 3, 969, 1046, 6, -4),
+  ];
+  const s = computeStats(playerMatches(withDraw, "a"));
+  eq([s.played, s.wins, s.losses, s.draws], [3, 1, 0, 2], "W/L/D");
+  eq(s.winRate, 1 / 3, "win rate counts draws as games");
+  eq(s.longestWinStreak, 1, "draw breaks the run");
+  eq(s.currentStreak, { result: "D", count: 2 }, "draw streak");
+  eq(s.form, ["D", "D", "W"], "form");
+  eq(recordsByPlayer(withDraw).get("b"), { wins: 0, losses: 1, draws: 2 }, "records");
+  eq(headToHead(playerMatches(withDraw, "a"))[0]!.draws, 2, "h2h draws");
 });

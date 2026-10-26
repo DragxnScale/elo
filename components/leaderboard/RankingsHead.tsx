@@ -14,7 +14,7 @@ export function RankingsHead() {
         <TableHead className="w-full">Player</TableHead>
         <TableHead numeric className="whitespace-nowrap">
           <span aria-hidden="true">W–L</span>
-          <span className="sr-only">Wins and losses</span>
+          <span className="sr-only">Wins, losses and draws</span>
         </TableHead>
         <TableHead numeric className={cn("whitespace-nowrap", WIN_RATE_COLUMN)}>
           Win %

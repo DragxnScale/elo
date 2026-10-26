@@ -1,6 +1,7 @@
 import type { Match } from "@/lib/types";
 
-export type MatchResult = "W" | "L";
+/** Win, loss or draw (a tied score). */
+export type MatchResult = "W" | "L" | "D";
 
 /** One match seen from a single player's side. */
 export type PlayerMatch = {
@@ -22,7 +23,8 @@ export type PlayerStats = {
   played: number;
   wins: number;
   losses: number;
-  /** 0–1, null when no matches. */
+  draws: number;
+  /** Wins / games played (draws count as games), 0–1; null when no matches. */
   winRate: number | null;
   /** wins / losses; equals wins when there are no losses; null when no matches. */
   winLossRatio: number | null;
@@ -42,8 +44,15 @@ export type HeadToHead = {
   opponentId: string;
   wins: number;
   losses: number;
+  draws: number;
   played: number;
 };
+
+export type MatchRecord = { wins: number; losses: number; draws: number };
+
+export function resultOf(pointsFor: number, pointsAgainst: number): MatchResult {
+  return pointsFor > pointsAgainst ? "W" : pointsFor < pointsAgainst ? "L" : "D";
+}
 
 export function toPlayerMatch(match: Match, playerId: string): PlayerMatch | null {
   const isP1 = match.player1_id === playerId;
@@ -59,7 +68,7 @@ export function toPlayerMatch(match: Match, playerId: string): PlayerMatch | nul
     leaderboardId: match.leaderboard_id,
     playedAt: match.created_at,
     opponentId: isP1 ? match.player2_id : match.player1_id,
-    result: pointsFor > pointsAgainst ? "W" : "L",
+    result: resultOf(pointsFor, pointsAgainst),
     pointsFor,
     pointsAgainst,
     eloBefore,
@@ -82,6 +91,7 @@ export function computeStats(history: PlayerMatch[], currentElo?: number): Playe
 
   let wins = 0;
   let losses = 0;
+  let draws = 0;
   let pointsFor = 0;
   let pointsAgainst = 0;
   let longestWinStreak = 0;
@@ -103,12 +113,14 @@ export function computeStats(history: PlayerMatch[], currentElo?: number): Playe
         biggestWin = m;
       }
     } else {
-      losses++;
+      // A draw ends a winning run too.
+      if (m.result === "L") losses++;
+      else draws++;
       run = 0;
     }
   }
 
-  const played = wins + losses;
+  const played = wins + losses + draws;
 
   let currentStreak: Streak = null;
   for (let i = ordered.length - 1; i >= 0; i--) {
@@ -122,6 +134,7 @@ export function computeStats(history: PlayerMatch[], currentElo?: number): Playe
     played,
     wins,
     losses,
+    draws,
     winRate: played ? wins / played : null,
     winLossRatio: played ? (losses ? wins / losses : wins) : null,
     currentStreak,
@@ -144,11 +157,13 @@ export function headToHead(history: PlayerMatch[]): HeadToHead[] {
       opponentId: m.opponentId,
       wins: 0,
       losses: 0,
+      draws: 0,
       played: 0,
     };
     row.played++;
     if (m.result === "W") row.wins++;
-    else row.losses++;
+    else if (m.result === "L") row.losses++;
+    else row.draws++;
     byOpponent.set(m.opponentId, row);
   }
   return [...byOpponent.values()].sort((a, b) => b.played - a.played);
@@ -161,19 +176,19 @@ export function eloSeries(history: PlayerMatch[]): number[] {
   return [ordered[0]!.eloBefore, ...ordered.map((m) => m.eloAfter)];
 }
 
-/** Wins and losses per player id across a set of matches. */
-export function recordsByPlayer(matches: Match[]): Map<string, { wins: number; losses: number }> {
-  const records = new Map<string, { wins: number; losses: number }>();
-  const bump = (id: string, won: boolean) => {
-    const r = records.get(id) ?? { wins: 0, losses: 0 };
-    if (won) r.wins++;
-    else r.losses++;
+/** Wins, losses and draws per player id across a set of matches. */
+export function recordsByPlayer(matches: Match[]): Map<string, MatchRecord> {
+  const records = new Map<string, MatchRecord>();
+  const bump = (id: string, result: MatchResult) => {
+    const r = records.get(id) ?? { wins: 0, losses: 0, draws: 0 };
+    if (result === "W") r.wins++;
+    else if (result === "L") r.losses++;
+    else r.draws++;
     records.set(id, r);
   };
   for (const m of matches) {
-    const p1Won = m.player1_score > m.player2_score;
-    bump(m.player1_id, p1Won);
-    bump(m.player2_id, !p1Won);
+    bump(m.player1_id, resultOf(m.player1_score, m.player2_score));
+    bump(m.player2_id, resultOf(m.player2_score, m.player1_score));
   }
   return records;
 }

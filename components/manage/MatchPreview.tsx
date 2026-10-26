@@ -18,14 +18,36 @@ export type PendingPreview = {
   result: EloChangeResult;
 };
 
-/** "Ana beat Ben, 21 to 17": winner first. Ties never reach a preview. */
+/** "Ana beat Ben, 21 to 17": winner first. "Ana and Ben tied, 3 to 3" for a draw. */
 export function describeResult(pending: PendingPreview): string {
+  if (pending.player1Score === pending.player2Score) {
+    const score = formatScore(pending.player1Score);
+    return `${pending.player1Name} and ${pending.player2Name} tied, ${score} to ${score}`;
+  }
   const player1Won = pending.player1Score > pending.player2Score;
   const winner = player1Won ? pending.player1Name : pending.player2Name;
   const loser = player1Won ? pending.player2Name : pending.player1Name;
   const winnerScore = player1Won ? pending.player1Score : pending.player2Score;
   const loserScore = player1Won ? pending.player2Score : pending.player1Score;
   return `${winner} beat ${loser}, ${formatScore(winnerScore)} to ${formatScore(loserScore)}`;
+}
+
+/** Why the numbers are what they are, in one line. */
+function explain(pending: PendingPreview): string {
+  const { result } = pending;
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
+  const parts = [
+    `${pending.player1Name} was expected to take ${pct(result.expectedScore)} of the points and took ${pct(result.actualScore)}`,
+    `factor ${Math.round(result.k)}`,
+  ];
+  const cushioned = [
+    { name: pending.player1Name, change: result.player1Change, cushion: result.player1Cushion },
+    { name: pending.player2Name, change: result.player2Change, cushion: result.player2Cushion },
+  ].filter((p) => p.change < 0 && p.cushion < 1);
+  for (const p of cushioned) {
+    parts.push(`${p.name}'s loss cushioned ×${p.cushion.toFixed(2)} for experience`);
+  }
+  return `${parts.join(" · ")}.`;
 }
 
 type MatchPreviewProps = {
@@ -120,10 +142,7 @@ export function MatchPreview({
           </li>
         ))}
       </ul>
-      <p className="text-sm text-muted-foreground">
-        Ratings are ELO. Score margin ×{result.scoreMultiplier.toFixed(2)} ·
-        Upset ×{result.upsetMultiplier.toFixed(2)}.
-      </p>
+      <p className="text-sm text-muted-foreground">{explain(pending)}</p>
       {error && (
         <Notice tone="error" title="Couldn't record the match">
           {error}

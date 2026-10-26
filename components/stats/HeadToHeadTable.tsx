@@ -29,7 +29,7 @@ export function HeadToHeadTable({
                 {names[r.opponentId] ?? "Unknown"}
               </TextLink>
             </TableCell>
-            <TableCell numeric>{formatRecord(r.wins, r.losses)}</TableCell>
+            <TableCell numeric>{formatRecord(r.wins, r.losses, r.draws)}</TableCell>
             <TableCell numeric className="text-muted-foreground">
               {r.played}
             </TableCell>
