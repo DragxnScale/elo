@@ -3,27 +3,30 @@
  * SQL copy (elo_change) that the database uses when recording a match; keep
  * the two in step (lib/elo.test.ts pins the behaviour).
  *
- * 1. Rating gap: standard ELO expectation. The favourite is expected to score
- *    E = 1 / (1 + 10^((theirs - yours) / 400)); a result moves ratings by
- *    K * (actual - expected). Beating someone far weaker earns almost nothing,
- *    an upset earns up to K, and a tie moves points toward the underdog.
- * 2. Score margin: a bigger win (or loss) scales the swing, up to x3.
- * 3. Cushioning: losses are smaller than gains (x0.75), and shrink further
- *    with experience, from x1.0 for a newcomer to x0.6 after 50 games.
- *    Gains are never cushioned.
- * 4. Ratings only go up overall: a decisive win always gains at least 1, and
- *    whoever gains always gains more than the other player loses (at least 1
- *    more), whatever the rounding. A tie between equal ratings changes nothing.
+ * Ratings move by how a result compares with what the ratings predicted:
+ *
+ * 1. Expected share of the points: E1 = 1 / (1 + 10^((R2 - R1) / 400)),
+ *    E2 = 1 - E1. Equal ratings expect a 50/50 game; a big favourite is
+ *    expected to take nearly every point.
+ * 2. Actual share of the points: A1 = 1/2 + 1/2 * (s1 - s2) / (|s1| + |s2|).
+ *    A shutout is 1, a tie is 1/2, and it works with negative scores.
+ * 3. Factor: K = 200 + 0.1 * |R1 - R2|, so the bigger the gap, the bigger
+ *    the stakes. Swing = K * (A1 - E1).
+ * 4. Whoever did better than expected gains |swing|; the other side loses
+ *    x0.75 of it, shrinking further with experience (x1.0 for a newcomer down
+ *    to x0.6 after 50 games). A favourite who wins by less than expected
+ *    loses rating; an underdog who loses narrowly gains.
+ * 5. Ratings only go up overall: whoever gains always gains at least 1 more
+ *    than the other player loses.
  */
 
 export type EloParams = {
-  /** Most a result can move a rating, before the score margin. */
+  /** Base factor: the swing between equal ratings for a shutout is K/2. */
   k?: number;
+  /** Added to K per point of rating gap. */
+  kPerGap?: number;
   /** Losses are this share of the matching gain. */
   lossRate?: number;
-  scoreScale?: number;
-  scorePower?: number;
-  maxScoreMultiplier?: number;
   /** Losses shrink by up to this share... */
   experienceCushion?: number;
   /** ...reached after this many games. */
@@ -31,11 +34,9 @@ export type EloParams = {
 };
 
 export const ELO_DEFAULTS: Required<EloParams> = {
-  k: 80,
+  k: 200,
+  kPerGap: 0.1,
   lossRate: 0.75,
-  scoreScale: 25,
-  scorePower: 0.75,
-  maxScoreMultiplier: 3,
   experienceCushion: 0.4,
   experienceGames: 50,
 };
@@ -43,14 +44,18 @@ export const ELO_DEFAULTS: Required<EloParams> = {
 export type MatchOutcome = "player1" | "player2" | "tie";
 
 export type EloChangeResult = {
+  /** Who won on the scoreboard (ratings can move the other way). */
   outcome: MatchOutcome;
   player1Change: number;
   player2Change: number;
   player1NewElo: number;
   player2NewElo: number;
-  /** Player 1's expected score, 0-1 (their chance of winning, roughly). */
+  /** Player 1's expected share of the points, 0-1. */
   expectedScore: number;
-  scoreMultiplier: number;
+  /** Player 1's actual share of the points, 0-1. */
+  actualScore: number;
+  /** The factor used: base K plus the rating-gap part. */
+  k: number;
   /** Loss multiplier from experience for each player (1 = no cushion). */
   player1Cushion: number;
   player2Cushion: number;
@@ -68,6 +73,13 @@ export function experienceCushion(gamesPlayed: number, params: EloParams = {}): 
   return 1 - (max * Math.min(games, experienceGames)) / experienceGames;
 }
 
+/** Player 1's share of the points, 0-1: shutout 1, tie 1/2. Handles negatives. */
+export function pointsShare(player1Score: number, player2Score: number): number {
+  const spread = Math.abs(player1Score) + Math.abs(player2Score);
+  if (spread === 0) return 0.5;
+  return 0.5 + (0.5 * (player1Score - player2Score)) / spread;
+}
+
 export function calculateEloChange(
   player1Elo: number,
   player2Elo: number,
@@ -76,46 +88,45 @@ export function calculateEloChange(
   games: { player1: number; player2: number } = { player1: 0, player2: 0 },
   params: EloParams = {}
 ): EloChangeResult {
-  const { k, lossRate, scoreScale, scorePower, maxScoreMultiplier } = {
-    ...ELO_DEFAULTS,
-    ...params,
-  };
+  const { k: baseK, kPerGap, lossRate } = { ...ELO_DEFAULTS, ...params };
 
   const expected1 = 1 / (1 + Math.pow(10, (player2Elo - player1Elo) / 400));
-  const actual1 = player1Score > player2Score ? 1 : player1Score < player2Score ? 0 : 0.5;
-  const margin = Math.abs(player1Score - player2Score);
-  const scoreMultiplier = Math.min(
-    maxScoreMultiplier,
-    1 + Math.pow(margin / scoreScale, scorePower)
-  );
+  const actual1 = pointsShare(player1Score, player2Score);
+  const k = baseK + kPerGap * Math.abs(player1Elo - player2Elo);
 
   const cushion1 = experienceCushion(games.player1, params);
   const cushion2 = experienceCushion(games.player2, params);
 
-  // Player 1's raw swing; player 2's is the opposite. Work in magnitudes:
-  // one side gains, the other loses a cushioned share of it.
-  const raw1 = k * (actual1 - expected1) * scoreMultiplier;
-  // Who gains: the winner; in a tie, the underdog (equal ratings: nobody).
-  const player1Gains = actual1 === 1 || (actual1 === 0.5 && raw1 >= 0);
-  const swing = Math.abs(raw1);
-  const loserCushion = player1Gains ? cushion2 : cushion1;
+  // Positive: player 1 beat expectations. Negative: player 2 did.
+  const swing = k * (actual1 - expected1);
+  const size = Math.abs(swing);
+  const loserCushion = swing > 0 ? cushion2 : cushion1;
 
-  let gain = roundHalfUp(swing);
-  if (actual1 !== 0.5) gain = Math.max(gain, 1);
-  let loss = roundHalfUp(swing * lossRate * loserCushion);
+  const gain = roundHalfUp(size);
+  let loss = roundHalfUp(size * lossRate * loserCushion);
   if (gain > 0) loss = Math.min(loss, gain - 1);
+  const lost = loss === 0 ? 0 : -loss;
 
-  const player1Change = player1Gains ? gain : -loss;
-  const player2Change = player1Gains ? -loss : gain;
+  let player1Change = 0;
+  let player2Change = 0;
+  if (swing > 0) {
+    player1Change = gain;
+    player2Change = lost;
+  } else if (swing < 0) {
+    player1Change = lost;
+    player2Change = gain;
+  }
 
   return {
-    outcome: actual1 === 1 ? "player1" : actual1 === 0 ? "player2" : "tie",
+    outcome:
+      player1Score > player2Score ? "player1" : player1Score < player2Score ? "player2" : "tie",
     player1Change,
     player2Change,
     player1NewElo: player1Elo + player1Change,
     player2NewElo: player2Elo + player2Change,
     expectedScore: expected1,
-    scoreMultiplier,
+    actualScore: actual1,
+    k,
     player1Cushion: cushion1,
     player2Cushion: cushion2,
   };

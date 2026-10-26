@@ -1,4 +1,4 @@
-import { calculateEloChange, experienceCushion } from "./elo";
+import { calculateEloChange, experienceCushion, pointsShare } from "./elo";
 
 function test(name: string, fn: () => void) {
   try {
@@ -14,6 +14,14 @@ function eq<T>(actual: T, expected: T, label: string) {
   if (actual !== expected) throw new Error(`${label}: expected ${expected}, got ${actual}`);
 }
 
+test("points share: shutout 1, tie 1/2, handles negatives", () => {
+  eq(pointsShare(21, 0), 1, "shutout");
+  eq(pointsShare(5, 5), 0.5, "tie");
+  eq(pointsShare(0, 0), 0.5, "0-0");
+  eq(pointsShare(10, 5), 0.5 + 0.5 * (5 / 15), "10-5");
+  eq(pointsShare(-3, -5), 0.5 + 0.5 * (2 / 8), "both negative");
+});
+
 test("tie between equal ratings changes nothing", () => {
   const r = calculateEloChange(1000, 1000, 5, 5);
   eq(r.outcome, "tie", "outcome");
@@ -21,80 +29,75 @@ test("tie between equal ratings changes nothing", () => {
   eq(r.player2Change, 0, "p2");
 });
 
-test("tie moves points from the favourite to the underdog", () => {
+test("tie across a huge gap gives the underdog thousands", () => {
+  // K = 200 + 0.1 * 99000 = 10100; expected ~100% vs actual 50%.
   const r = calculateEloChange(100000, 1000, 3, 3);
-  eq(r.player2Change, 40, "underdog gains K/2");
-  eq(r.player1Change, -30, "favourite loses 75% of that (new player)");
+  eq(r.player2Change, 5050, "underdog gain");
+  eq(r.player1Change, -3788, "favourite loss");
 });
 
-test("beating a far weaker player earns the minimum", () => {
+test("a favourite who wins by less than expected loses rating", () => {
+  const huge = calculateEloChange(100000, 1000, 21, 17);
+  eq(huge.outcome, "player1", "favourite won");
+  if (!(huge.player1Change < 0 && huge.player2Change > 1000)) {
+    throw new Error(`${huge.player1Change} / ${huge.player2Change}`);
+  }
+  // 1200 vs 1000 expects ~76% of the points; 21-15 is only 58%.
+  const normal = calculateEloChange(1200, 1000, 21, 15);
+  eq(normal.player1Change, -29, "favourite");
+  eq(normal.player2Change, 39, "underdog");
+});
+
+test("a result exactly as expected changes nothing", () => {
   const r = calculateEloChange(100000, 1000, 21, 0);
-  eq(r.player1Change, 1, "favourite gain");
-  eq(r.player2Change, 0, "underdog loss");
+  eq(r.player1Change, 0, "favourite");
+  eq(r.player2Change, 0, "underdog");
 });
 
-test("the winner always gains more than the loser loses", () => {
-  // Every combination of gaps, scores and experience: ratings never shrink.
-  for (const gap of [0, 50, 200, 400, 800, 2000, 99000]) {
-    for (const [s1, s2] of [[1, 0], [21, 20], [21, 0], [0, 21], [5, 5], [-3, 4]]) {
-      for (const games of [0, 10, 49, 50, 200]) {
-        for (const [e1, e2] of [[1000 + gap, 1000], [1000, 1000 + gap]]) {
-          const r = calculateEloChange(e1, e2, s1, s2, { player1: games, player2: 200 - games });
-          const total = r.player1Change + r.player2Change;
-          if (r.outcome !== "tie" && total < 1) {
-            throw new Error(`win ${e1}/${e2} ${s1}-${s2}: ${r.player1Change} / ${r.player2Change}`);
-          }
-          if (r.outcome === "tie" && (total < 0 || (e1 !== e2 && total < 1))) {
-            throw new Error(`tie ${e1}/${e2}: ${r.player1Change} / ${r.player2Change}`);
-          }
-          const winnerChange = r.outcome === "player1" ? r.player1Change : r.player2Change;
-          if (r.outcome !== "tie" && winnerChange < 1) throw new Error("a win always gains");
-        }
-      }
-    }
-  }
+test("the closer the result to expectations, the smaller the swing", () => {
+  const narrow = calculateEloChange(100000, 1000, 21, 17).player2Change;
+  const wider = calculateEloChange(100000, 1000, 21, 5).player2Change;
+  if (!(narrow > wider && wider > 0)) throw new Error(`${narrow} vs ${wider}`);
 });
 
-test("an upset earns the most", () => {
-  const upset = calculateEloChange(800, 1400, 10, 5);
-  const favourite = calculateEloChange(1400, 800, 10, 5);
-  if (upset.player1Change <= favourite.player1Change * 5) {
-    throw new Error(`upset ${upset.player1Change} vs favourite ${favourite.player1Change}`);
-  }
-});
-
-test("even match: winner gains, loser loses 75% of it", () => {
-  const r = calculateEloChange(1000, 1000, 10, 5);
-  // K 80 * 0.5 * margin x(1 + (5/25)^0.75) = 40 * 1.299 -> 52; loss 52 * 0.75 -> 39.
-  eq(r.player1Change, 52, "gain");
-  eq(r.player2Change, -39, "loss");
-});
-
-test("larger score margin increases the swing, capped at x3", () => {
-  const close = calculateEloChange(1000, 1000, 11, 10);
-  const blowout = calculateEloChange(1000, 1000, 20, 10);
-  const absurd = calculateEloChange(1000, 1000, 1000, 0);
-  if (blowout.player1Change <= close.player1Change) throw new Error("margin");
-  eq(absurd.scoreMultiplier, 3, "cap");
-  eq(absurd.player1Change, 120, "capped gain");
+test("even ratings: bigger margins move more", () => {
+  eq(calculateEloChange(1000, 1000, 21, 17).player1Change, 11, "21-17 gain");
+  eq(calculateEloChange(1000, 1000, 10, 5).player1Change, 33, "10-5 gain");
+  const shutout = calculateEloChange(1000, 1000, 21, 0);
+  eq(shutout.player1Change, 100, "shutout gain");
+  eq(shutout.player2Change, -75, "shutout loss");
 });
 
 test("experience cushions losses, not gains", () => {
-  const rookie = calculateEloChange(1000, 1000, 10, 5, { player1: 0, player2: 0 });
-  const veteran = calculateEloChange(1000, 1000, 10, 5, { player1: 0, player2: 80 });
-  eq(veteran.player1Change, rookie.player1Change, "winner gain unchanged");
-  // Raw swing 51.96 x 0.75 x 0.6 (50+ games) = 23.4 -> 23, against 39 for a newcomer.
-  eq(veteran.player2Change, -23, "veteran loss x0.6");
+  const rookie = calculateEloChange(1000, 1000, 21, 0, { player1: 0, player2: 0 });
+  const veteran = calculateEloChange(1000, 1000, 21, 0, { player1: 0, player2: 80 });
+  eq(veteran.player1Change, rookie.player1Change, "gain unchanged");
+  eq(veteran.player2Change, -45, "100 x 0.75 x 0.6");
   eq(experienceCushion(0), 1, "new");
   eq(experienceCushion(25), 0.8, "halfway");
   eq(experienceCushion(50), 0.6, "floor reached");
   eq(experienceCushion(500), 0.6, "floor");
 });
 
-test("player changes apply to the right sides", () => {
-  const r = calculateEloChange(1000, 1200, 3, 10);
+test("whoever gains always gains more than the other loses", () => {
+  for (const [e1, e2] of [[1000, 1000], [1200, 1000], [1000, 1400], [100000, 1000], [1000, 100000]]) {
+    for (const [s1, s2] of [[1, 0], [21, 20], [21, 0], [0, 21], [5, 5], [-3, 4], [21, 17]]) {
+      for (const g of [0, 10, 50, 200]) {
+        const r = calculateEloChange(e1, e2, s1, s2, { player1: g, player2: 200 - g });
+        const gained = Math.max(r.player1Change, r.player2Change);
+        const total = r.player1Change + r.player2Change;
+        if (gained > 0 && total < 1) {
+          throw new Error(`${e1}/${e2} ${s1}-${s2}: ${r.player1Change} / ${r.player2Change}`);
+        }
+        if (gained === 0 && total !== 0) throw new Error("no gain means no loss");
+      }
+    }
+  }
+});
+
+test("changes apply to the right sides", () => {
+  const r = calculateEloChange(1000, 1200, 3, 21);
   eq(r.outcome, "player2", "outcome");
   eq(r.player1NewElo, 1000 + r.player1Change, "p1 elo");
   eq(r.player2NewElo, 1200 + r.player2Change, "p2 elo");
-  if (r.player2Change <= 0 || r.player1Change >= 0) throw new Error("signs");
 });

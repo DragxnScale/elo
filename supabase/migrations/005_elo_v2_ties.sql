@@ -1,16 +1,16 @@
--- Rating formula v2: rating gap, ties, and experience cushioning.
+-- Rating formula v2: performance against expectations, ties, and
+-- experience cushioning.
 -- Run once in the Supabase SQL Editor (after 004_members_and_roles.sql).
--- Safe to re-run.
+-- Safe to re-run (also if you ran an earlier version of this file).
 --
 -- Mirrors lib/elo.ts calculateEloChange exactly:
---   expected   E1 = 1 / (1 + 10^((R2 - R1) / 400))
---   actual     S1 = 1 win, 0 loss, 0.5 tie
---   margin     x min(3, 1 + (|s1 - s2| / 25)^0.75)
---   swing      80 * (S1 - E1) * margin, and the opposite for player 2
---   losses     x 0.75, and x (1 - 0.4 * min(games, 50) / 50) for experience
---   rounding   floor(x + 0.5), like JavaScript's Math.round
---   floor      a decisive win gains at least 1, and whoever gains always
---              gains more than the other player loses (ratings only go up)
+--   expected share   E1 = 1 / (1 + 10^((R2 - R1) / 400))
+--   actual share     A1 = 1/2 + 1/2 * (s1 - s2) / (|s1| + |s2|)   (tie = 1/2)
+--   factor           K  = 200 + 0.1 * |R1 - R2|
+--   swing            K * (A1 - E1); whoever beat expectations gains |swing|
+--   losses           x 0.75, and x (1 - 0.4 * min(games, 50) / 50) for experience
+--   floor            the gainer always gains at least 1 more than the other loses
+--   rounding         floor(x + 0.5), like JavaScript's Math.round
 
 -- 1. Ties are allowed now.
 do $$
@@ -45,35 +45,42 @@ as $$
 declare
   v_expected double precision;
   v_actual double precision;
-  v_margin double precision;
-  v_raw1 double precision;
+  v_spread double precision;
+  v_k double precision;
+  v_swing double precision;
+  v_size double precision;
   v_cushion1 double precision;
   v_cushion2 double precision;
-  v_p1_gains boolean;
   v_gain integer;
   v_loss integer;
 begin
   v_expected := 1.0 / (1.0 + power(10.0::double precision, (p_elo2 - p_elo1)::double precision / 400.0));
-  v_actual := case when p_score1 > p_score2 then 1.0 when p_score1 < p_score2 then 0.0 else 0.5 end;
-  v_margin := least(3.0, 1.0 + power(abs(p_score1 - p_score2)::double precision / 25.0, 0.75));
+  v_spread := abs(p_score1)::double precision + abs(p_score2)::double precision;
+  if v_spread = 0 then
+    v_actual := 0.5;
+  else
+    v_actual := 0.5 + (0.5 * (p_score1 - p_score2)::double precision) / v_spread;
+  end if;
+  v_k := 200.0 + 0.1 * abs(p_elo1 - p_elo2)::double precision;
   v_cushion1 := 1.0 - (0.4 * least(greatest(p_games1, 0), 50)) / 50.0;
   v_cushion2 := 1.0 - (0.4 * least(greatest(p_games2, 0), 50)) / 50.0;
 
-  v_raw1 := 80.0 * (v_actual - v_expected) * v_margin;
-  -- Who gains: the winner; in a tie, the underdog (equal ratings: nobody).
-  v_p1_gains := v_actual = 1.0 or (v_actual = 0.5 and v_raw1 >= 0);
-
-  v_gain := floor(abs(v_raw1) + 0.5);
-  if v_actual <> 0.5 then
-    v_gain := greatest(v_gain, 1);
-  end if;
-  v_loss := floor(abs(v_raw1) * 0.75 * (case when v_p1_gains then v_cushion2 else v_cushion1 end) + 0.5);
+  -- Positive: player 1 beat expectations. Negative: player 2 did.
+  v_swing := v_k * (v_actual - v_expected);
+  v_size := abs(v_swing);
+  v_gain := floor(v_size + 0.5);
+  v_loss := floor(v_size * 0.75 * (case when v_swing > 0 then v_cushion2 else v_cushion1 end) + 0.5);
   if v_gain > 0 then
     v_loss := least(v_loss, v_gain - 1);
   end if;
 
-  change1 := case when v_p1_gains then v_gain else -v_loss end;
-  change2 := case when v_p1_gains then -v_loss else v_gain end;
+  if v_swing > 0 then
+    change1 := v_gain; change2 := -v_loss;
+  elsif v_swing < 0 then
+    change1 := -v_loss; change2 := v_gain;
+  else
+    change1 := 0; change2 := 0;
+  end if;
 end;
 $$;
 

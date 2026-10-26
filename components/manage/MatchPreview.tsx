@@ -35,15 +35,11 @@ export function describeResult(pending: PendingPreview): string {
 /** Why the numbers are what they are, in one line. */
 function explain(pending: PendingPreview): string {
   const { result } = pending;
-  const p1Favoured = result.expectedScore >= 0.5;
-  const favourite = p1Favoured ? pending.player1Name : pending.player2Name;
-  const chance = Math.round((p1Favoured ? result.expectedScore : 1 - result.expectedScore) * 100);
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
   const parts = [
-    chance === 50
-      ? "Even ratings"
-      : `${favourite} was expected to win ${chance}% of the time`,
+    `${pending.player1Name} was expected to take ${pct(result.expectedScore)} of the points and took ${pct(result.actualScore)}`,
+    `factor ${Math.round(result.k)}`,
   ];
-  if (result.scoreMultiplier > 1) parts.push(`score margin ×${result.scoreMultiplier.toFixed(2)}`);
   const cushioned = [
     { name: pending.player1Name, change: result.player1Change, cushion: result.player1Cushion },
     { name: pending.player2Name, change: result.player2Change, cushion: result.player2Cushion },
