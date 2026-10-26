@@ -27,10 +27,32 @@ test("tie moves points from the favourite to the underdog", () => {
   eq(r.player1Change, -30, "favourite loses 75% of that (new player)");
 });
 
-test("beating a far weaker player earns ~nothing", () => {
+test("beating a far weaker player earns the minimum", () => {
   const r = calculateEloChange(100000, 1000, 21, 0);
-  eq(r.player1Change, 0, "favourite gain");
+  eq(r.player1Change, 1, "favourite gain");
   eq(r.player2Change, 0, "underdog loss");
+});
+
+test("the winner always gains more than the loser loses", () => {
+  // Every combination of gaps, scores and experience: ratings never shrink.
+  for (const gap of [0, 50, 200, 400, 800, 2000, 99000]) {
+    for (const [s1, s2] of [[1, 0], [21, 20], [21, 0], [0, 21], [5, 5], [-3, 4]]) {
+      for (const games of [0, 10, 49, 50, 200]) {
+        for (const [e1, e2] of [[1000 + gap, 1000], [1000, 1000 + gap]]) {
+          const r = calculateEloChange(e1, e2, s1, s2, { player1: games, player2: 200 - games });
+          const total = r.player1Change + r.player2Change;
+          if (r.outcome !== "tie" && total < 1) {
+            throw new Error(`win ${e1}/${e2} ${s1}-${s2}: ${r.player1Change} / ${r.player2Change}`);
+          }
+          if (r.outcome === "tie" && (total < 0 || (e1 !== e2 && total < 1))) {
+            throw new Error(`tie ${e1}/${e2}: ${r.player1Change} / ${r.player2Change}`);
+          }
+          const winnerChange = r.outcome === "player1" ? r.player1Change : r.player2Change;
+          if (r.outcome !== "tie" && winnerChange < 1) throw new Error("a win always gains");
+        }
+      }
+    }
+  }
 });
 
 test("an upset earns the most", () => {

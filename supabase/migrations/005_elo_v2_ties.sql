@@ -9,6 +9,8 @@
 --   swing      80 * (S1 - E1) * margin, and the opposite for player 2
 --   losses     x 0.75, and x (1 - 0.4 * min(games, 50) / 50) for experience
 --   rounding   floor(x + 0.5), like JavaScript's Math.round
+--   floor      a decisive win gains at least 1, and whoever gains always
+--              gains more than the other player loses (ratings only go up)
 
 -- 1. Ties are allowed now.
 do $$
@@ -47,6 +49,9 @@ declare
   v_raw1 double precision;
   v_cushion1 double precision;
   v_cushion2 double precision;
+  v_p1_gains boolean;
+  v_gain integer;
+  v_loss integer;
 begin
   v_expected := 1.0 / (1.0 + power(10.0::double precision, (p_elo2 - p_elo1)::double precision / 400.0));
   v_actual := case when p_score1 > p_score2 then 1.0 when p_score1 < p_score2 then 0.0 else 0.5 end;
@@ -55,13 +60,20 @@ begin
   v_cushion2 := 1.0 - (0.4 * least(greatest(p_games2, 0), 50)) / 50.0;
 
   v_raw1 := 80.0 * (v_actual - v_expected) * v_margin;
+  -- Who gains: the winner; in a tie, the underdog (equal ratings: nobody).
+  v_p1_gains := v_actual = 1.0 or (v_actual = 0.5 and v_raw1 >= 0);
 
-  change1 := case when v_raw1 >= 0
-    then floor(v_raw1 + 0.5)
-    else floor(v_raw1 * 0.75 * v_cushion1 + 0.5) end;
-  change2 := case when -v_raw1 >= 0
-    then floor(-v_raw1 + 0.5)
-    else floor(-v_raw1 * 0.75 * v_cushion2 + 0.5) end;
+  v_gain := floor(abs(v_raw1) + 0.5);
+  if v_actual <> 0.5 then
+    v_gain := greatest(v_gain, 1);
+  end if;
+  v_loss := floor(abs(v_raw1) * 0.75 * (case when v_p1_gains then v_cushion2 else v_cushion1 end) + 0.5);
+  if v_gain > 0 then
+    v_loss := least(v_loss, v_gain - 1);
+  end if;
+
+  change1 := case when v_p1_gains then v_gain else -v_loss end;
+  change2 := case when v_p1_gains then -v_loss else v_gain end;
 end;
 $$;
 

@@ -11,6 +11,9 @@
  * 3. Cushioning: losses are smaller than gains (x0.75), and shrink further
  *    with experience, from x1.0 for a newcomer to x0.6 after 50 games.
  *    Gains are never cushioned.
+ * 4. Ratings only go up overall: a decisive win always gains at least 1, and
+ *    whoever gains always gains more than the other player loses (at least 1
+ *    more), whatever the rounding. A tie between equal ratings changes nothing.
  */
 
 export type EloParams = {
@@ -89,14 +92,21 @@ export function calculateEloChange(
   const cushion1 = experienceCushion(games.player1, params);
   const cushion2 = experienceCushion(games.player2, params);
 
-  // Player 1's raw swing; player 2's is the opposite.
+  // Player 1's raw swing; player 2's is the opposite. Work in magnitudes:
+  // one side gains, the other loses a cushioned share of it.
   const raw1 = k * (actual1 - expected1) * scoreMultiplier;
-  const raw2 = -raw1;
-  const settle = (raw: number, cushion: number) =>
-    raw >= 0 ? roundHalfUp(raw) : roundHalfUp(raw * lossRate * cushion);
+  // Who gains: the winner; in a tie, the underdog (equal ratings: nobody).
+  const player1Gains = actual1 === 1 || (actual1 === 0.5 && raw1 >= 0);
+  const swing = Math.abs(raw1);
+  const loserCushion = player1Gains ? cushion2 : cushion1;
 
-  const player1Change = settle(raw1, cushion1);
-  const player2Change = settle(raw2, cushion2);
+  let gain = roundHalfUp(swing);
+  if (actual1 !== 0.5) gain = Math.max(gain, 1);
+  let loss = roundHalfUp(swing * lossRate * loserCushion);
+  if (gain > 0) loss = Math.min(loss, gain - 1);
+
+  const player1Change = player1Gains ? gain : -loss;
+  const player2Change = player1Gains ? -loss : gain;
 
   return {
     outcome: actual1 === 1 ? "player1" : actual1 === 0 ? "player2" : "tie",
