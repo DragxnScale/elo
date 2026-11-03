@@ -699,6 +699,23 @@ export async function restorePlayer(playerId: string) {
   return memberRpc("restore_player", { p_player_id: playerId });
 }
 
+/** Owner or admin: rename a player on the board (1-40 characters, unique on the board). */
+export async function renamePlayer(playerId: string, name: string) {
+  const trimmed = name.trim();
+  if (!trimmed || trimmed.length > 40) return { error: "Names must be 1 to 40 characters." };
+  const result = await memberRpc("rename_player", { p_player_id: playerId, p_name: trimmed });
+  if (result.error?.includes("duplicate key")) {
+    return { error: "Someone on this board already has that name." };
+  }
+  if (result.error === MIGRATION_004) {
+    return {
+      error:
+        "Renaming needs a database update. Run supabase/migrations/006_bigger_swings_rename.sql in the Supabase SQL Editor.",
+    };
+  }
+  return result;
+}
+
 /** Owner only: set a player's rating by hand. Logged with the optional reason. */
 export async function adjustRating(playerId: string, newElo: number, reason?: string) {
   if (!Number.isInteger(newElo) || newElo < 0 || newElo > 100000) {
