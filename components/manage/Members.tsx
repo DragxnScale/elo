@@ -7,6 +7,7 @@ import {
   getBoardMembers,
   linkPlayerToAccount,
   removePlayer,
+  renamePlayer,
   restorePlayer,
   setPlayerRole,
 } from "@/app/actions";
@@ -51,6 +52,8 @@ export function Members({ leaderboardId, role, ownerId, refreshKey, onChanged }:
   const [announcement, setAnnouncement] = useState("");
   const [linking, setLinking] = useState<string | null>(null);
   const [linkDraft, setLinkDraft] = useState("");
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState("");
   const [removing, setRemoving] = useState<BoardMember | null>(null);
   const [rating, setRating] = useState<BoardMember | null>(null);
   const latest = useRef(0);
@@ -120,8 +123,8 @@ export function Members({ leaderboardId, role, ownerId, refreshKey, onChanged }:
       title="Members"
       description={
         isOwner
-          ? "People who enter the board's code join it here. Admins can record and undo matches, add players and remove regular players."
-          : "You're an admin: you can record matches, add players and remove regular players."
+          ? "People who enter the board's code join it here. Admins can record and undo matches, add, rename and remove regular players."
+          : "You're an admin: you can record matches, add and rename players, and remove regular players."
       }
     >
       <ul className="border-t border-border">
@@ -152,6 +155,20 @@ export function Members({ leaderboardId, role, ownerId, refreshKey, onChanged }:
               </div>
 
               <div className="-ml-3 flex flex-wrap items-center gap-x-1 gap-y-1">
+                {renaming !== m.id && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={rowBusy}
+                    onClick={() => {
+                      setRenaming(m.id);
+                      setNameDraft(m.name);
+                      setLinking(null);
+                    }}
+                  >
+                    Rename
+                  </Button>
+                )}
                 {isOwner && m.user_id && (
                   <Button
                     variant="ghost"
@@ -181,6 +198,7 @@ export function Members({ leaderboardId, role, ownerId, refreshKey, onChanged }:
                     onClick={() => {
                       setLinking(m.id);
                       setLinkDraft("");
+                      setRenaming(null);
                     }}
                   >
                     Link account
@@ -204,6 +222,43 @@ export function Members({ leaderboardId, role, ownerId, refreshKey, onChanged }:
                   </Button>
                 )}
               </div>
+
+              {renaming === m.id && (
+                <form
+                  noValidate
+                  className="flex items-start gap-2"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const next = nameDraft.trim();
+                    if (!next || rowBusy) return;
+                    if (next === m.name) {
+                      setRenaming(null);
+                      return;
+                    }
+                    const ok = await act(m, () => renamePlayer(m.id, next), `${m.name} is now ${next}.`);
+                    if (ok) setRenaming(null);
+                  }}
+                >
+                  <Field label={`New name for ${m.name}`} hideLabel className="min-w-0 flex-1 sm:max-w-56">
+                    <Input
+                      autoFocus
+                      value={nameDraft}
+                      maxLength={40}
+                      onChange={(e) => setNameDraft(e.target.value)}
+                      autoComplete="off"
+                      autoCapitalize="words"
+                      spellCheck={false}
+                      enterKeyHint="done"
+                    />
+                  </Field>
+                  <Button type="submit" variant="secondary" loading={rowBusy} disabled={!nameDraft.trim()}>
+                    Save
+                  </Button>
+                  <Button variant="ghost" onClick={() => setRenaming(null)}>
+                    Cancel
+                  </Button>
+                </form>
+              )}
 
               {linking === m.id && (
                 <form

@@ -31,10 +31,10 @@ test("tie between equal ratings changes nothing", () => {
 });
 
 test("tie across a huge gap gives the underdog thousands", () => {
-  // K = 200 + 0.1 * 99000 = 10100; expected ~100% vs actual 50%.
+  // K = 600 + 0.3 * 99000 = 30300; expected ~100% vs actual 50%.
   const r = calculateEloChange(100000, 1000, 3, 3);
-  eq(r.player2Change, 5050, "underdog gain");
-  eq(r.player1Change, -3788, "favourite loss");
+  eq(r.player2Change, 15150, "underdog gain");
+  eq(r.player1Change, -11363, "favourite loss");
 });
 
 test("a favourite who wins by less than expected loses rating", () => {
@@ -45,8 +45,8 @@ test("a favourite who wins by less than expected loses rating", () => {
   }
   // 1200 vs 1000 expects ~76% of the points; 21-15 is only 58%.
   const normal = calculateEloChange(1200, 1000, 21, 15);
-  eq(normal.player1Change, -29, "favourite");
-  eq(normal.player2Change, 39, "underdog");
+  eq(normal.player1Change, -87, "favourite");
+  eq(normal.player2Change, 116, "underdog");
 });
 
 test("a result exactly as expected changes nothing", () => {
@@ -62,18 +62,18 @@ test("the closer the result to expectations, the smaller the swing", () => {
 });
 
 test("even ratings: bigger margins move more", () => {
-  eq(calculateEloChange(1000, 1000, 21, 17).player1Change, 11, "21-17 gain");
-  eq(calculateEloChange(1000, 1000, 10, 5).player1Change, 33, "10-5 gain");
+  eq(calculateEloChange(1000, 1000, 21, 17).player1Change, 32, "21-17 gain");
+  eq(calculateEloChange(1000, 1000, 10, 5).player1Change, 100, "10-5 gain");
   const shutout = calculateEloChange(1000, 1000, 21, 0);
-  eq(shutout.player1Change, 100, "shutout gain");
-  eq(shutout.player2Change, -75, "shutout loss");
+  eq(shutout.player1Change, 300, "shutout gain");
+  eq(shutout.player2Change, -225, "shutout loss");
 });
 
 test("experience cushions losses, not gains", () => {
   const rookie = calculateEloChange(1000, 1000, 21, 0, { player1: 0, player2: 0 });
   const veteran = calculateEloChange(1000, 1000, 21, 0, { player1: 0, player2: 80 });
   eq(veteran.player1Change, rookie.player1Change, "gain unchanged");
-  eq(veteran.player2Change, -45, "100 x 0.75 x 0.6");
+  eq(veteran.player2Change, -135, "300 x 0.75 x 0.6");
   eq(experienceCushion(0), 1, "new");
   eq(experienceCushion(25), 0.8, "halfway");
   eq(experienceCushion(50), 0.6, "floor reached");
@@ -115,4 +115,11 @@ test("expected shares are shown precisely, never rounded to 100% or 0%", () => {
   eq(formatShare(huge.expectedScore2), "3.2 × 10⁻²⁴⁶%", "astronomically small");
   eq(formatShare(1, { exact: true }), "100%", "a real shutout");
   eq(formatShare(0.5), "50%", "even");
+});
+
+test("the screenshot case moves a lot more than before", () => {
+  // 800 vs 700: expected 64% / 36%, actual 27.7% / 72.3%; K = 630.
+  const r = calculateEloChange(800, 700, 46, 120);
+  eq(r.player2Change, 229, "underdog winner");
+  eq(r.player1Change, -171, "favourite loser");
 });

@@ -1,5 +1,5 @@
 /**
- * Kleos rating formula. supabase/migrations/005_elo_v2_ties.sql has an exact
+ * Kleos rating formula. supabase/migrations/006_bigger_swings_rename.sql has an exact
  * SQL copy (elo_change) that the database uses when recording a match; keep
  * the two in step (lib/elo.test.ts pins the behaviour).
  *
@@ -10,7 +10,7 @@
  *    expected to take nearly every point.
  * 2. Actual share of the points: A1 = 1/2 + 1/2 * (s1 - s2) / (|s1| + |s2|).
  *    A shutout is 1, a tie is 1/2, and it works with negative scores.
- * 3. Factor: K = 200 + 0.1 * |R1 - R2|, so the bigger the gap, the bigger
+ * 3. Factor: K = 600 + 0.3 * |R1 - R2|, so the bigger the gap, the bigger
  *    the stakes. Swing = K * (A1 - E1).
  * 4. Whoever did better than expected gains |swing|; the other side loses
  *    x0.75 of it, shrinking further with experience (x1.0 for a newcomer down
@@ -34,8 +34,8 @@ export type EloParams = {
 };
 
 export const ELO_DEFAULTS: Required<EloParams> = {
-  k: 200,
-  kPerGap: 0.1,
+  k: 600,
+  kPerGap: 0.3,
   lossRate: 0.75,
   experienceCushion: 0.4,
   experienceGames: 50,
