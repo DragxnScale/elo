@@ -288,35 +288,14 @@ export async function getGamesPlayed(leaderboardId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("matches")
-    .select("player1_id, player2_id")
+    .select("*")
     .eq("leaderboard_id", leaderboardId);
   const games: Record<string, number> = {};
-  for (const m of data ?? []) {
+  for (const m of ((data ?? []) as Match[]).filter(isLive)) {
     games[m.player1_id] = (games[m.player1_id] ?? 0) + 1;
     games[m.player2_id] = (games[m.player2_id] ?? 0) + 1;
   }
   return { games };
-}
-
-/** Undo the newest match on one of your boards: both ratings go back, the match is deleted. */
-export async function undoLastMatch(leaderboardId: string) {
-  const { supabase } = await requireUser();
-
-  const { data: match, error } = await supabase.rpc("undo_last_match", {
-    p_leaderboard_id: leaderboardId,
-  });
-
-  if (error) {
-    if (error.code === "PGRST202") {
-      return { error: "Database is missing undo_last_match(). Run supabase/migrations/003_undo_last_match.sql." };
-    }
-    // 40001 (ratings moved), P0002 (nothing to undo) and 42501 (not the
-    // owner) carry messages written for people.
-    return { error: error.message };
-  }
-
-  revalidatePath("/");
-  return { match: match as Match };
 }
 
 type SupabaseServer = Awaited<ReturnType<typeof createClient>>;
@@ -395,7 +374,12 @@ export async function getBoardsIPlayIn() {
   return { leaderboards };
 }
 
-/** Recent matches on a leaderboard, newest first. */
+/** Deleted matches stay in the history but count for nothing. */
+function isLive(match: Match): boolean {
+  return !match.deleted_at;
+}
+
+/** Recent live matches on a leaderboard, newest first. */
 export async function getMatches(leaderboardId: string, limit = 200) {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -406,7 +390,55 @@ export async function getMatches(leaderboardId: string, limit = 200) {
     .limit(limit);
 
   if (error) return { error: error.message, matches: [] as Match[] };
-  return { matches: (data ?? []) as Match[] };
+  return { matches: ((data ?? []) as Match[]).filter(isLive) };
+}
+
+/**
+ * Every match on a board, deleted ones included, newest first, with the
+ * names of everyone who played (also players who left or were removed).
+ */
+export async function getMatchHistory(leaderboardId: string) {
+  const supabase = await createClient();
+  const [{ data, error }, { data: people }] = await Promise.all([
+    supabase
+      .from("matches")
+      .select("*")
+      .eq("leaderboard_id", leaderboardId)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false }),
+    supabase.from("players").select("id, name").eq("leaderboard_id", leaderboardId),
+  ]);
+  if (error) return { error: error.message, matches: [] as Match[], names: {} as Record<string, string> };
+  const names: Record<string, string> = {};
+  for (const p of people ?? []) names[p.id as string] = p.name as string;
+  return { matches: (data ?? []) as Match[], names };
+}
+
+const MIGRATION_007 =
+  "Match history needs a database update. Run supabase/migrations/007_match_history.sql in the Supabase SQL Editor.";
+
+async function historyRpc(fn: "delete_match" | "restore_match", matchId: string) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc(fn, { p_match_id: matchId });
+  if (error) {
+    if (error.code === "PGRST202") return { error: MIGRATION_007 };
+    return { error: error.message };
+  }
+  revalidatePath("/");
+  return { success: true as const };
+}
+
+/**
+ * Owner or admin: delete a match. It stays in the history (restorable), and
+ * every match after it is recalculated in order.
+ */
+export async function deleteMatch(matchId: string) {
+  return historyRpc("delete_match", matchId);
+}
+
+/** Owner or admin: put a deleted match back; everything after it is recalculated. */
+export async function restoreMatch(matchId: string) {
+  return historyRpc("restore_match", matchId);
 }
 
 /** Linked usernames keyed by user id. */
@@ -452,7 +484,7 @@ export async function getPlayerDetail(playerId: string) {
   return {
     player: player as Player,
     leaderboard: leaderboard as Leaderboard,
-    matches: (matches ?? []) as Match[],
+    matches: ((matches ?? []) as Match[]).filter(isLive),
     players,
     // Rank among players still on the board; 0 if this one left or was removed.
     rank: players.filter(isOnBoard).findIndex((p) => p.id === playerId) + 1,
@@ -494,7 +526,7 @@ export async function getProfileDetail(username: string) {
       .select("*")
       .or(`player1_id.in.(${list}),player2_id.in.(${list})`)
       .order("created_at", { ascending: true });
-    matches = (data ?? []) as Match[];
+    matches = ((data ?? []) as Match[]).filter(isLive);
 
     const opponentIds = [
       ...new Set(matches.flatMap((m) => [m.player1_id, m.player2_id])),
