@@ -44,4 +44,7 @@ export type Match = {
   player2_change: number;
   created_by: string | null;
   created_at: string;
+  /** Set when the match was deleted (restorable). Missing before migration 007. */
+  deleted_at?: string | null;
+  deleted_by?: string | null;
 };

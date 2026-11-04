@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { getPlayers } from "@/app/actions";
 import { LeaderboardTable } from "@/components/LeaderboardTable";
 import { AddPlayer } from "@/components/manage/AddPlayer";
-import { LastMatch } from "@/components/manage/LastMatch";
+import { MatchHistory } from "@/components/manage/MatchHistory";
 import { Members } from "@/components/manage/Members";
 import { RecordMatch } from "@/components/manage/RecordMatch";
 import { Section } from "@/components/ui/section";
@@ -83,11 +83,10 @@ export function BoardWorkbench({
         onRetry={refreshPlayers}
         onRecorded={refreshPlayersAndTable}
       />
-      <LastMatch
+      <MatchHistory
         leaderboardId={board.id}
-        players={players}
         refreshKey={tableKey}
-        onUndone={refreshPlayersAndTable}
+        onChanged={refreshPlayersAndTable}
       />
       <AddPlayer
         leaderboardId={board.id}
